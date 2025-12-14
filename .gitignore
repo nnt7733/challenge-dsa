@@ -1,0 +1,23 @@
+# Build results
+bin/
+obj/
+*.exe
+*.dll
+*.pdb
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NuGet
+packages/
+
+# Keep data files
+!MinRide/Data/*.csv
+

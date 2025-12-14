@@ -1,0 +1,179 @@
+namespace MinRide.Models;
+
+/// <summary>
+/// Represents a driver in the MinRide system.
+/// </summary>
+public class Driver
+{
+    /// <summary>
+    /// Gets or sets the unique identifier for the driver.
+    /// </summary>
+    public int Id { get; set; }
+
+    /// <summary>
+    /// Gets or sets the name of the driver.
+    /// </summary>
+    public string Name { get; set; }
+
+    /// <summary>
+    /// Gets the rating of the driver (0.0 to 5.0).
+    /// </summary>
+    public double Rating { get; private set; }
+
+    /// <summary>
+    /// Gets or sets the current location of the driver as (X, Y) coordinates.
+    /// </summary>
+    public (double X, double Y) Location { get; set; }
+
+    /// <summary>
+    /// Gets the total number of rides completed by the driver.
+    /// </summary>
+    public int TotalRides { get; private set; }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Driver"/> class.
+    /// </summary>
+    /// <param name="id">The unique identifier for the driver.</param>
+    /// <param name="name">The name of the driver.</param>
+    /// <param name="rating">The initial rating of the driver (must be between 0.0 and 5.0).</param>
+    /// <param name="x">The X coordinate of the driver's location.</param>
+    /// <param name="y">The Y coordinate of the driver's location.</param>
+    /// <exception cref="ArgumentException">Thrown when rating is not between 0.0 and 5.0.</exception>
+    public Driver(int id, string name, double rating, double x, double y)
+    {
+        if (rating < 0.0 || rating > 5.0)
+        {
+            throw new ArgumentException("Rating must be between 0.0 and 5.0.", nameof(rating));
+        }
+
+        Id = id;
+        Name = name;
+        Rating = rating;
+        Location = (x, y);
+        TotalRides = 0;
+    }
+
+    /// <summary>
+    /// Sets the rating of the driver.
+    /// </summary>
+    /// <param name="rating">The new rating value (must be between 0.0 and 5.0).</param>
+    /// <exception cref="ArgumentException">Thrown when rating is not between 0.0 and 5.0.</exception>
+    public void SetRating(double rating)
+    {
+        if (rating < 0.0 || rating > 5.0)
+        {
+            throw new ArgumentException("Rating must be between 0.0 and 5.0.", nameof(rating));
+        }
+
+        Rating = rating;
+    }
+
+    /// <summary>
+    /// Calculates the Euclidean distance from the driver's location to a specified point.
+    /// </summary>
+    /// <param name="point">The target point as (X, Y) coordinates.</param>
+    /// <returns>The Euclidean distance to the specified point.</returns>
+    public double DistanceTo((double X, double Y) point)
+    {
+        return Math.Sqrt(Math.Pow(Location.X - point.X, 2) + Math.Pow(Location.Y - point.Y, 2));
+    }
+
+    /// <summary>
+    /// Increments the total number of rides completed by the driver by one.
+    /// </summary>
+    public void IncrementRides()
+    {
+        TotalRides++;
+    }
+
+    /// <summary>
+    /// Decrements the total number of rides completed by the driver by one.
+    /// </summary>
+    public void DecrementRides()
+    {
+        if (TotalRides > 0)
+        {
+            TotalRides--;
+        }
+    }
+
+    /// <summary>
+    /// Sets the total number of rides directly.
+    /// </summary>
+    /// <param name="totalRides">The total rides count to set.</param>
+    public void SetTotalRides(int totalRides)
+    {
+        TotalRides = Math.Max(0, totalRides);
+    }
+
+    /// <summary>
+    /// Displays the driver's information to the console.
+    /// </summary>
+    public void Display()
+    {
+        Console.WriteLine($"ID: {Id} | Name: {Name} | Rating: {Rating:F1} | Location: ({Location.X}, {Location.Y}) | Total Rides: {TotalRides}");
+    }
+
+    /// <summary>
+    /// Displays detailed driver information in a formatted box.
+    /// </summary>
+    public void DisplayDetailed()
+    {
+        // Generate star rating visualization
+        int fullStars = (int)Rating;
+        bool hasHalfStar = (Rating - fullStars) >= 0.5;
+        string stars = new string('★', fullStars) + (hasHalfStar ? "☆" : "") + new string('☆', 5 - fullStars - (hasHalfStar ? 1 : 0));
+
+        Console.WriteLine("╔══════════════════════════════════════════╗");
+        Console.WriteLine("║          THÔNG TIN TÀI XẾ                ║");
+        Console.WriteLine("╠══════════════════════════════════════════╣");
+        Console.WriteLine($"║ ID:              {Id,-24} ║");
+        Console.WriteLine($"║ Tên:             {Name,-24} ║");
+        Console.WriteLine($"║ Rating:          {Rating:F1} {stars,-17} ║");
+        Console.WriteLine($"║ Vị trí:          ({Location.X:F1}, {Location.Y:F1}){"",-14} ║");
+        Console.WriteLine($"║ Tổng số chuyến:  {TotalRides,-24} ║");
+        Console.WriteLine("╚══════════════════════════════════════════╝");
+    }
+
+    /// <summary>
+    /// Converts the driver's data to a CSV-formatted string.
+    /// </summary>
+    /// <returns>A comma-separated string containing the driver's data.</returns>
+    public string ToCSV()
+    {
+        return $"{Id},{Name},{Rating},{Location.X},{Location.Y},{TotalRides}";
+    }
+
+    /// <summary>
+    /// Creates a new <see cref="Driver"/> instance from a CSV-formatted string.
+    /// </summary>
+    /// <param name="csvLine">A comma-separated string containing driver data.</param>
+    /// <returns>A new <see cref="Driver"/> instance populated with the parsed data.</returns>
+    /// <exception cref="FormatException">Thrown when the CSV line cannot be parsed correctly.</exception>
+    public static Driver FromCSV(string csvLine)
+    {
+        try
+        {
+            string[] parts = csvLine.Split(',');
+            int id = int.Parse(parts[0]);
+            string name = parts[1];
+            double rating = double.Parse(parts[2]);
+            double x = double.Parse(parts[3]);
+            double y = double.Parse(parts[4]);
+            int totalRides = int.Parse(parts[5]);
+
+            Driver driver = new Driver(id, name, rating, x, y);
+            for (int i = 0; i < totalRides; i++)
+            {
+                driver.IncrementRides();
+            }
+
+            return driver;
+        }
+        catch (Exception ex) when (ex is IndexOutOfRangeException || ex is FormatException || ex is OverflowException)
+        {
+            throw new FormatException($"Failed to parse CSV line: {csvLine}", ex);
+        }
+    }
+}
+
