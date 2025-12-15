@@ -70,6 +70,7 @@ public static class DataGenerator
 
     /// <summary>
     /// Generates a list of random drivers.
+    /// TotalRides will be set to 0 and synced later based on actual rides data.
     /// </summary>
     public static List<Driver> GenerateDrivers(int count)
     {
@@ -78,14 +79,7 @@ public static class DataGenerator
         {
             var location = GenerateLocation();
             var driver = new Driver(i, GenerateName(), GenerateRating(), location.X, location.Y);
-            
-            // Add random total rides
-            int totalRides = random.Next(5, 100);
-            for (int j = 0; j < totalRides; j++)
-            {
-                driver.IncrementRides();
-            }
-            
+            // TotalRides starts at 0, will be synced with actual rides data
             drivers.Add(driver);
         }
         return drivers;
@@ -131,6 +125,7 @@ public static class DataGenerator
 
     /// <summary>
     /// Generates and saves sample data to CSV files.
+    /// Driver's TotalRides will be synced with actual confirmed rides.
     /// </summary>
     public static void GenerateAndSaveData(int driverCount, int customerCount, int rideCount, string dataFolder = "Data")
     {
@@ -142,6 +137,16 @@ public static class DataGenerator
         
         Console.WriteLine($"Generating {rideCount} rides...");
         var rides = GenerateRides(rideCount, customerCount, driverCount);
+
+        // Sync driver's TotalRides with actual confirmed rides
+        var driverDict = drivers.ToDictionary(d => d.Id);
+        foreach (var ride in rides.Where(r => r.Status == "CONFIRMED"))
+        {
+            if (driverDict.TryGetValue(ride.DriverId, out var driver))
+            {
+                driver.IncrementRides();
+            }
+        }
 
         // Ensure data folder exists
         Directory.CreateDirectory(dataFolder);

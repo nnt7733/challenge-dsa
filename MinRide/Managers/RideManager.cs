@@ -134,6 +134,29 @@ public class RideManager
     }
 
     /// <summary>
+    /// Adds a ride from history (loaded from CSV file).
+    /// </summary>
+    /// <param name="ride">The ride to add.</param>
+    public void AddRideFromHistory(Ride ride)
+    {
+        // Add to ride history
+        rideHistory.AddLast(ride);
+
+        // Add to driver rides dictionary
+        if (!driverRides.ContainsKey(ride.DriverId))
+        {
+            driverRides[ride.DriverId] = new List<Ride>();
+        }
+        driverRides[ride.DriverId].Add(ride);
+
+        // Update nextRideId if needed
+        if (ride.RideId >= nextRideId)
+        {
+            nextRideId = ride.RideId + 1;
+        }
+    }
+
+    /// <summary>
     /// Gets the queue of pending rides.
     /// </summary>
     /// <returns>The pending rides queue.</returns>

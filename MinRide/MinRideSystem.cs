@@ -33,12 +33,14 @@ public class MinRideSystem
 
     /// <summary>
     /// Loads data from CSV files.
+    /// Validates rides (driver and customer must exist) and syncs TotalRides.
     /// </summary>
     private void LoadData()
     {
         Console.WriteLine("Đang tải dữ liệu...");
-        int driverCount = 0, customerCount = 0, rideCount = 0;
+        int driverCount = 0, customerCount = 0, rideCount = 0, invalidRideCount = 0;
 
+        // Step 1: Load drivers (reset TotalRides to 0)
         try
         {
             if (File.Exists(DriversFilePath))
@@ -46,6 +48,8 @@ public class MinRideSystem
                 var drivers = FileHandler.LoadDrivers(DriversFilePath);
                 foreach (var driver in drivers)
                 {
+                    // Reset TotalRides to 0, will be synced from actual rides
+                    driver.SetTotalRides(0);
                     driverManager.AddDriver(driver, silent: true);
                     driverCount++;
                 }
@@ -56,6 +60,7 @@ public class MinRideSystem
             Console.WriteLine($"✗ Lỗi tải tài xế: {ex.Message}");
         }
 
+        // Step 2: Load customers
         try
         {
             if (File.Exists(CustomersFilePath))
@@ -73,12 +78,34 @@ public class MinRideSystem
             Console.WriteLine($"✗ Lỗi tải khách hàng: {ex.Message}");
         }
 
+        // Step 3: Load rides with validation
         try
         {
             if (File.Exists(RidesFilePath))
             {
                 var rides = FileHandler.LoadRides(RidesFilePath);
-                rideCount = rides.Count;
+                foreach (var ride in rides)
+                {
+                    // Validate: driver and customer must exist
+                    var driver = driverManager.FindDriverById(ride.DriverId);
+                    var customer = customerManager.FindCustomerById(ride.CustomerId);
+
+                    if (driver == null || customer == null)
+                    {
+                        invalidRideCount++;
+                        continue; // Skip invalid ride
+                    }
+
+                    // Add valid ride to RideManager
+                    rideManager.AddRideFromHistory(ride);
+                    rideCount++;
+
+                    // Sync TotalRides: increment for confirmed rides
+                    if (ride.Status == "CONFIRMED")
+                    {
+                        driver.IncrementRides();
+                    }
+                }
             }
         }
         catch (Exception ex)
@@ -88,6 +115,10 @@ public class MinRideSystem
 
         // Show summary
         Console.WriteLine($"✓ Đã tải: {driverCount} tài xế | {customerCount} khách hàng | {rideCount} chuyến đi");
+        if (invalidRideCount > 0)
+        {
+            Console.WriteLine($"⚠ Bỏ qua {invalidRideCount} chuyến đi không hợp lệ (tài xế/khách hàng không tồn tại)");
+        }
     }
 
     /// <summary>
@@ -991,50 +1022,16 @@ public class MinRideSystem
     }
 
     /// <summary>
-    /// Ride management sub-menu.
+    /// Ride management - View driver's ride history sorted by time.
     /// </summary>
     private void ManageRides()
     {
-        bool back = false;
-
-        while (!back)
-        {
-            Console.WriteLine();
-            Console.WriteLine("┌────────────────────────────────────────┐");
-            Console.WriteLine("│         QUẢN LÝ CHUYẾN ĐI              │");
-            Console.WriteLine("├────────────────────────────────────────┤");
-            Console.WriteLine("│  1. Xem lịch sử chuyến đi của tài xế   │");
-            Console.WriteLine("│  2. Xem chuyến đi đang chờ             │");
-            Console.WriteLine("│  3. Xác nhận tất cả chuyến đi          │");
-            Console.WriteLine("│  4. Hủy chuyến đi đang chờ             │");
-            Console.WriteLine("│  5. Quay lại                           │");
-            Console.WriteLine("└────────────────────────────────────────┘");
-            Console.Write("Chọn chức năng: ");
-
-            string? choice = Console.ReadLine();
-
-            switch (choice)
-            {
-                case "1":
-                    ViewDriverRideHistory();
-                    break;
-                case "2":
-                    rideManager.DisplayPendingRides();
-                    break;
-                case "3":
-                    rideManager.ConfirmAllRides();
-                    break;
-                case "4":
-                    rideManager.CancelPendingRides();
-                    break;
-                case "5":
-                    back = true;
-                    break;
-                default:
-                    Console.WriteLine("Lựa chọn không hợp lệ.");
-                    break;
-            }
-        }
+        Console.WriteLine();
+        Console.WriteLine("┌────────────────────────────────────────────────┐");
+        Console.WriteLine("│    QUẢN LÝ CHUYẾN ĐI - XEM LỊCH SỬ TÀI XẾ     │");
+        Console.WriteLine("└────────────────────────────────────────────────┘");
+        
+        ViewDriverRideHistory();
     }
 
     /// <summary>
@@ -1842,91 +1839,31 @@ public class MinRideSystem
         Console.WriteLine("\n--- THÔNG TIN TÀI XẾ ---");
         driver.DisplayDetailed();
 
-        // Ask for filter options
-        Console.WriteLine("\nChọn bộ lọc:");
-        Console.WriteLine("1. Tất cả chuyến đi");
-        Console.WriteLine("2. Chỉ chuyến đã xác nhận (CONFIRMED)");
-        Console.WriteLine("3. Chỉ chuyến đã hủy (CANCELLED)");
-        Console.WriteLine("4. Theo khoảng thời gian");
-        Console.Write("Lựa chọn: ");
-
-        string? filterChoice = Console.ReadLine()?.Trim();
-
-        string? statusFilter = null;
-        DateTime? fromDate = null;
-        DateTime? toDate = null;
-
-        switch (filterChoice)
-        {
-            case "2":
-                statusFilter = "CONFIRMED";
-                break;
-            case "3":
-                statusFilter = "CANCELLED";
-                break;
-            case "4":
-                Console.Write("Nhập ngày bắt đầu (dd/MM/yyyy, Enter để bỏ qua): ");
-                string? fromInput = Console.ReadLine()?.Trim();
-                if (!string.IsNullOrEmpty(fromInput))
-                {
-                    if (DateTime.TryParseExact(fromInput, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime from))
-                    {
-                        fromDate = from;
-                    }
-                    else
-                    {
-                        Console.WriteLine("Định dạng ngày không hợp lệ.");
-                    }
-                }
-
-                Console.Write("Nhập ngày kết thúc (dd/MM/yyyy, Enter để bỏ qua): ");
-                string? toInput = Console.ReadLine()?.Trim();
-                if (!string.IsNullOrEmpty(toInput))
-                {
-                    if (DateTime.TryParseExact(toInput, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime to))
-                    {
-                        toDate = to.AddDays(1).AddSeconds(-1); // End of day
-                    }
-                    else
-                    {
-                        Console.WriteLine("Định dạng ngày không hợp lệ.");
-                    }
-                }
-                break;
-        }
-
-        var rides = rideManager.GetRidesByDriverFiltered(driverId, statusFilter, fromDate, toDate);
+        // Get all rides sorted by timestamp (ascending - oldest first)
+        var rides = rideManager.GetRidesByDriver(driverId);
 
         if (rides.Count == 0)
         {
-            Console.WriteLine("\nKhông có chuyến đi nào phù hợp với bộ lọc.");
+            Console.WriteLine("\nTài xế này chưa có chuyến đi nào.");
             return;
         }
 
-        // Display rides in table format
-        Console.WriteLine($"\n--- LỊCH SỬ CHUYẾN ĐI CỦA TÀI XẾ D{driverId} ---");
-        Console.WriteLine("┌─────────┬────────────┬─────────────┬───────────────┬────────────┬─────────────────────┐");
-        Console.WriteLine("│ RideID  │ Khách hàng │ Quãng đường │    Giá cước   │ Trạng thái │     Thời gian       │");
-        Console.WriteLine("├─────────┼────────────┼─────────────┼───────────────┼────────────┼─────────────────────┤");
+        // Display rides in table format, sorted by time
+        Console.WriteLine($"\n--- DANH SÁCH CHUYẾN ĐI CỦA TÀI XẾ D{driverId} (SẮP XẾP THEO THỜI GIAN) ---");
+        Console.WriteLine("┌─────┬─────────┬────────────┬─────────────┬───────────────┬────────────┬─────────────────────┐");
+        Console.WriteLine("│ STT │ RideID  │ Khách hàng │ Quãng đường │    Giá cước   │ Trạng thái │     Thời gian       │");
+        Console.WriteLine("├─────┼─────────┼────────────┼─────────────┼───────────────┼────────────┼─────────────────────┤");
 
+        int stt = 1;
         foreach (var ride in rides)
         {
             string status = ride.Status.Length > 10 ? ride.Status.Substring(0, 7) + "..." : ride.Status;
-            Console.WriteLine($"│ {ride.RideId,7} │ C{ride.CustomerId,-9} │ {ride.Distance,9:F1}km │ {ride.Fare,11:N0}đ │ {status,-10} │ {ride.Timestamp:dd/MM/yyyy HH:mm} │");
+            Console.WriteLine($"│ {stt,3} │ {ride.RideId,7} │ C{ride.CustomerId,-9} │ {ride.Distance,9:F1}km │ {ride.Fare,11:N0}đ │ {status,-10} │ {ride.Timestamp:dd/MM/yyyy HH:mm} │");
+            stt++;
         }
-        Console.WriteLine("└─────────┴────────────┴─────────────┴───────────────┴────────────┴─────────────────────┘");
+        Console.WriteLine("└─────┴─────────┴────────────┴─────────────┴───────────────┴────────────┴─────────────────────┘");
 
-        // Calculate and display statistics
-        var stats = rideManager.GetDriverStats(driverId);
-
-        Console.WriteLine("\n╔══════════════════════════════════════════╗");
-        Console.WriteLine("║              THỐNG KÊ                    ║");
-        Console.WriteLine("╠══════════════════════════════════════════╣");
-        Console.WriteLine($"║ Tổng số chuyến:          {stats.TotalRides,-16} ║");
-        Console.WriteLine($"║ Chuyến đã xác nhận:      {stats.ConfirmedCount,-16} ║");
-        Console.WriteLine($"║ Tổng doanh thu:          {stats.TotalRevenue:N0} VND{"",-3} ║");
-        Console.WriteLine($"║ Quãng đường trung bình:  {stats.AverageDistance:F2} km{"",-8} ║");
-        Console.WriteLine("╚══════════════════════════════════════════╝");
+        Console.WriteLine($"\nTổng số chuyến đi: {rides.Count}");
     }
 
     #endregion
