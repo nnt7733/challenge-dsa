@@ -1022,16 +1022,75 @@ public class MinRideSystem
     }
 
     /// <summary>
-    /// Ride management - View driver's ride history sorted by time.
+    /// Ride management sub-menu.
     /// </summary>
     private void ManageRides()
     {
-        Console.WriteLine();
-        Console.WriteLine("┌────────────────────────────────────────────────┐");
-        Console.WriteLine("│    QUẢN LÝ CHUYẾN ĐI - XEM LỊCH SỬ TÀI XẾ     │");
-        Console.WriteLine("└────────────────────────────────────────────────┘");
-        
-        ViewDriverRideHistory();
+        bool back = false;
+
+        while (!back)
+        {
+            // Auto-confirm expired rides
+            rideManager.AutoConfirmExpiredRides(driverManager);
+
+            Console.WriteLine();
+            Console.WriteLine("┌────────────────────────────────────────────────┐");
+            Console.WriteLine("│              QUẢN LÝ CHUYẾN ĐI                 │");
+            Console.WriteLine("├────────────────────────────────────────────────┤");
+            Console.WriteLine("│  1. Xem lịch sử chuyến đi của tài xế           │");
+            Console.WriteLine("│  2. Xem các chuyến đi đang chờ                 │");
+            Console.WriteLine("│  3. Xác nhận tất cả chuyến đi                  │");
+            Console.WriteLine("│  4. Hủy chuyến đi (trong vòng 2 phút)          │");
+            Console.WriteLine("│  5. Quay lại                                   │");
+            Console.WriteLine("└────────────────────────────────────────────────┘");
+            Console.Write("Chọn chức năng: ");
+
+            string? choice = Console.ReadLine();
+
+            switch (choice)
+            {
+                case "1":
+                    ViewDriverRideHistory();
+                    break;
+                case "2":
+                    rideManager.DisplayPendingRides();
+                    break;
+                case "3":
+                    rideManager.ConfirmAllRides(driverManager);
+                    break;
+                case "4":
+                    CancelPendingRide();
+                    break;
+                case "5":
+                    back = true;
+                    break;
+                default:
+                    Console.WriteLine("Lựa chọn không hợp lệ.");
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Cancel a pending ride by ID.
+    /// </summary>
+    private void CancelPendingRide()
+    {
+        // Show pending rides first
+        rideManager.DisplayPendingRides();
+
+        if (rideManager.GetPendingRides().Count == 0)
+        {
+            return;
+        }
+
+        Console.Write("\nNhập ID chuyến đi cần hủy (0 để quay lại): ");
+        if (!TryReadInt(out int rideId) || rideId == 0)
+        {
+            return;
+        }
+
+        rideManager.CancelRideById(rideId);
     }
 
     /// <summary>
@@ -1260,17 +1319,11 @@ public class MinRideSystem
         {
             rideManager.CreateRide(customerId, driverId, totalDistance);
 
-            // Increment driver's TotalRides
-            driver.IncrementRides();
+            // TotalRides will be incremented when the ride is confirmed (not now)
 
-            // Push undo action
-            undoStack.Push(() =>
-            {
-                rideManager.CancelPendingRides();
-                Console.WriteLine("Đã hoàn tác đặt xe.");
-            });
-
-            Console.WriteLine("Đặt xe thành công! Chuyến đi đã được thêm vào hàng đợi.");
+            Console.WriteLine("\n✓ Đặt xe thành công! Chuyến đi đã được thêm vào hàng đợi.");
+            Console.WriteLine("⚠ Bạn có thể hủy chuyến trong vòng 2 phút.");
+            Console.WriteLine("  Sau 2 phút, chuyến đi sẽ tự động được xác nhận.");
         }
         else
         {
@@ -1420,20 +1473,14 @@ public class MinRideSystem
         Console.WriteLine($"\nTổng quãng đường: {totalDistance:F2} km");
         Console.WriteLine($"Giá cước ước tính: {fare:N0} VND");
 
-        // Create ride automatically (no confirmation in auto mode)
+        // Create ride (will be added to pending queue)
         rideManager.CreateRide(customerId, bestDriver.Id, totalDistance);
 
-        // Increment driver's TotalRides
-        bestDriver.IncrementRides();
+        // TotalRides will be incremented when the ride is confirmed (not now)
 
-        // Push undo action
-        undoStack.Push(() =>
-        {
-            rideManager.CancelPendingRides();
-            Console.WriteLine("Đã hoàn tác ghép cặp tự động.");
-        });
-
-        Console.WriteLine("\nĐã tự động ghép cặp và tạo chuyến đi thành công!");
+        Console.WriteLine("\n✓ Đã tự động ghép cặp và tạo chuyến đi thành công!");
+        Console.WriteLine("⚠ Chuyến đi đã được thêm vào hàng đợi.");
+        Console.WriteLine("  Bạn có thể hủy trong vòng 2 phút, sau đó sẽ tự động xác nhận.");
     }
 
     /// <summary>
@@ -1836,34 +1883,50 @@ public class MinRideSystem
             return;
         }
 
-        Console.WriteLine("\n--- THÔNG TIN TÀI XẾ ---");
-        driver.DisplayDetailed();
+        Console.WriteLine("\n╔══════════════════════════════════════════════════════════════╗");
+        Console.WriteLine("║                    THÔNG TIN TÀI XẾ                          ║");
+        Console.WriteLine("╠══════════════════════════════════════════════════════════════╣");
+        Console.WriteLine($"║  ID:              {driver.Id,-42} ║");
+        Console.WriteLine($"║  Tên:             {driver.Name,-42} ║");
+        Console.WriteLine($"║  Rating:          {driver.Rating:F1} ★{"",-38} ║");
+        Console.WriteLine($"║  Vị trí:          ({driver.Location.X:F1}, {driver.Location.Y:F1}){"",-32} ║");
+        Console.WriteLine($"║  Tổng số chuyến:  {driver.TotalRides,-42} ║");
+        Console.WriteLine("╚══════════════════════════════════════════════════════════════╝");
 
-        // Get all rides sorted by timestamp (ascending - oldest first)
-        var rides = rideManager.GetRidesByDriver(driverId);
+        // Get all confirmed rides sorted by timestamp (ascending - oldest first)
+        var rides = rideManager.GetRidesByDriver(driverId)
+            .Where(r => r.Status == "CONFIRMED")
+            .OrderBy(r => r.Timestamp)
+            .ToList();
 
         if (rides.Count == 0)
         {
-            Console.WriteLine("\nTài xế này chưa có chuyến đi nào.");
+            Console.WriteLine("\nTài xế này chưa có chuyến đi đã hoàn thành nào.");
             return;
         }
 
-        // Display rides in table format, sorted by time
-        Console.WriteLine($"\n--- DANH SÁCH CHUYẾN ĐI CỦA TÀI XẾ D{driverId} (SẮP XẾP THEO THỜI GIAN) ---");
-        Console.WriteLine("┌─────┬─────────┬────────────┬─────────────┬───────────────┬────────────┬─────────────────────┐");
-        Console.WriteLine("│ STT │ RideID  │ Khách hàng │ Quãng đường │    Giá cước   │ Trạng thái │     Thời gian       │");
-        Console.WriteLine("├─────┼─────────┼────────────┼─────────────┼───────────────┼────────────┼─────────────────────┤");
+        // Display rides in table format (without Status and Time columns)
+        Console.WriteLine($"\n╔══════════════════════════════════════════════════════════════════════════════╗");
+        Console.WriteLine($"║      DANH SÁCH CHUYẾN ĐI ĐÃ HOÀN THÀNH CỦA TÀI XẾ D{driverId,-24} ║");
+        Console.WriteLine($"╠══════════════════════════════════════════════════════════════════════════════╣");
+        Console.WriteLine("║  STT  │  RideID  │  Khách hàng  │  Quãng đường      │  Giá cước              ║");
+        Console.WriteLine("╠═══════╪══════════╪══════════════╪═══════════════════╪════════════════════════╣");
 
         int stt = 1;
+        double totalDistance = 0;
+        double totalFare = 0;
+
         foreach (var ride in rides)
         {
-            string status = ride.Status.Length > 10 ? ride.Status.Substring(0, 7) + "..." : ride.Status;
-            Console.WriteLine($"│ {stt,3} │ {ride.RideId,7} │ C{ride.CustomerId,-9} │ {ride.Distance,9:F1}km │ {ride.Fare,11:N0}đ │ {status,-10} │ {ride.Timestamp:dd/MM/yyyy HH:mm} │");
+            Console.WriteLine($"║  {stt,3}  │  {ride.RideId,6}  │  C{ride.CustomerId,-10} │  {ride.Distance,13:F1} km  │  {ride.Fare,18:N0} đ  ║");
+            totalDistance += ride.Distance;
+            totalFare += ride.Fare;
             stt++;
         }
-        Console.WriteLine("└─────┴─────────┴────────────┴─────────────┴───────────────┴────────────┴─────────────────────┘");
 
-        Console.WriteLine($"\nTổng số chuyến đi: {rides.Count}");
+        Console.WriteLine("╠═══════╧══════════╧══════════════╧═══════════════════╧════════════════════════╣");
+        Console.WriteLine($"║  TỔNG CỘNG: {rides.Count} chuyến  │  {totalDistance,13:F1} km  │  {totalFare,18:N0} đ  ║");
+        Console.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
     }
 
     #endregion

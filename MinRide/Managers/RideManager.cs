@@ -56,7 +56,8 @@ public class RideManager
     /// <summary>
     /// Confirms all pending rides and moves them to ride history.
     /// </summary>
-    public void ConfirmAllRides()
+    /// <param name="driverManager">Optional driver manager to update TotalRides.</param>
+    public void ConfirmAllRides(DriverManager? driverManager = null)
     {
         int confirmedCount = 0;
 
@@ -75,10 +76,24 @@ public class RideManager
             }
             driverRides[ride.DriverId].Add(ride);
 
+            // Update driver's TotalRides
+            if (driverManager != null)
+            {
+                var driver = driverManager.FindDriverById(ride.DriverId);
+                driver?.IncrementRides();
+            }
+
             confirmedCount++;
         }
 
-        Console.WriteLine($"Confirmed {confirmedCount} ride(s).");
+        if (confirmedCount > 0)
+        {
+            Console.WriteLine($"✓ Đã xác nhận {confirmedCount} chuyến đi.");
+        }
+        else
+        {
+            Console.WriteLine("Không có chuyến đi nào để xác nhận.");
+        }
     }
 
     /// <summary>
@@ -107,21 +122,128 @@ public class RideManager
     }
 
     /// <summary>
-    /// Displays all pending rides in the queue.
+    /// Displays all pending rides in the queue with detailed info.
     /// </summary>
     public void DisplayPendingRides()
     {
+        // Auto-confirm expired rides first
+        AutoConfirmExpiredRides();
+
         if (pendingRides.Count == 0)
         {
-            Console.WriteLine("No pending rides.");
+            Console.WriteLine("Không có chuyến đi nào đang chờ.");
             return;
         }
 
-        Console.WriteLine($"Pending Rides ({pendingRides.Count}):");
+        Console.WriteLine($"\n--- DANH SÁCH CHUYẾN ĐI ĐANG CHỜ ({pendingRides.Count} chuyến) ---");
+        Console.WriteLine("┌─────┬─────────┬────────────┬────────────┬─────────────┬───────────────┬──────────────────┐");
+        Console.WriteLine("│ STT │ RideID  │ Khách hàng │  Tài xế    │ Quãng đường │    Giá cước   │ Còn lại (hủy)    │");
+        Console.WriteLine("├─────┼─────────┼────────────┼────────────┼─────────────┼───────────────┼──────────────────┤");
+
+        int stt = 1;
         foreach (var ride in pendingRides)
         {
-            ride.Display();
+            int remaining = ride.GetRemainingCancelTime();
+            string remainingStr = remaining > 0 ? $"{remaining}s" : "Hết hạn";
+            Console.WriteLine($"│ {stt,3} │ {ride.RideId,7} │ C{ride.CustomerId,-9} │ D{ride.DriverId,-9} │ {ride.Distance,9:F1}km │ {ride.Fare,11:N0}đ │ {remainingStr,-16} │");
+            stt++;
         }
+        Console.WriteLine("└─────┴─────────┴────────────┴────────────┴─────────────┴───────────────┴──────────────────┘");
+        Console.WriteLine("\n⚠ Chuyến đi sẽ tự động xác nhận sau 2 phút nếu không bị hủy.");
+    }
+
+    /// <summary>
+    /// Auto-confirms rides that have been pending for more than 2 minutes.
+    /// </summary>
+    /// <param name="driverManager">Optional driver manager to update TotalRides.</param>
+    /// <returns>Number of rides auto-confirmed.</returns>
+    public int AutoConfirmExpiredRides(DriverManager? driverManager = null)
+    {
+        if (pendingRides.Count == 0) return 0;
+
+        var stillPending = new Queue<Ride>();
+        int autoConfirmedCount = 0;
+
+        while (pendingRides.Count > 0)
+        {
+            var ride = pendingRides.Dequeue();
+            
+            if (!ride.CanBeCancelled())
+            {
+                // Expired - auto confirm
+                ride.Confirm();
+                rideHistory.AddLast(ride);
+                
+                if (!driverRides.ContainsKey(ride.DriverId))
+                {
+                    driverRides[ride.DriverId] = new List<Ride>();
+                }
+                driverRides[ride.DriverId].Add(ride);
+
+                // Update driver's TotalRides
+                if (driverManager != null)
+                {
+                    var driver = driverManager.FindDriverById(ride.DriverId);
+                    driver?.IncrementRides();
+                }
+
+                autoConfirmedCount++;
+            }
+            else
+            {
+                stillPending.Enqueue(ride);
+            }
+        }
+
+        // Restore still pending rides
+        while (stillPending.Count > 0)
+        {
+            pendingRides.Enqueue(stillPending.Dequeue());
+        }
+
+        if (autoConfirmedCount > 0)
+        {
+            Console.WriteLine($"✓ Tự động xác nhận {autoConfirmedCount} chuyến đi đã hết thời gian hủy.");
+        }
+
+        return autoConfirmedCount;
+    }
+
+    /// <summary>
+    /// Cancels a specific pending ride by ID (only if within 2 minutes).
+    /// </summary>
+    /// <param name="rideId">The ride ID to cancel.</param>
+    /// <returns>True if cancelled, false otherwise.</returns>
+    public bool CancelRideById(int rideId)
+    {
+        // Auto-confirm expired rides first
+        AutoConfirmExpiredRides();
+
+        var ridesList = pendingRides.ToList();
+        var rideToCancel = ridesList.FirstOrDefault(r => r.RideId == rideId);
+
+        if (rideToCancel == null)
+        {
+            Console.WriteLine($"✗ Không tìm thấy chuyến đi ID {rideId} trong danh sách chờ.");
+            return false;
+        }
+
+        if (!rideToCancel.CanBeCancelled())
+        {
+            Console.WriteLine($"✗ Chuyến đi ID {rideId} đã quá 2 phút, không thể hủy.");
+            return false;
+        }
+
+        // Remove from list and rebuild queue
+        ridesList.Remove(rideToCancel);
+        pendingRides.Clear();
+        foreach (var ride in ridesList)
+        {
+            pendingRides.Enqueue(ride);
+        }
+
+        Console.WriteLine($"✓ Đã hủy chuyến đi ID: {rideId}");
+        return true;
     }
 
     /// <summary>

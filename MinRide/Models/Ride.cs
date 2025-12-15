@@ -109,6 +109,28 @@ public class Ride
     }
 
     /// <summary>
+    /// Checks if the ride can be cancelled (within 2 minutes of creation).
+    /// </summary>
+    /// <returns><c>true</c> if the ride can be cancelled; otherwise, <c>false</c>.</returns>
+    public bool CanBeCancelled()
+    {
+        if (Status != "PENDING") return false;
+        TimeSpan elapsed = DateTime.Now - Timestamp;
+        return elapsed.TotalMinutes < 2;
+    }
+
+    /// <summary>
+    /// Gets the remaining time in seconds before the ride is auto-confirmed.
+    /// </summary>
+    /// <returns>Remaining seconds, or 0 if already expired.</returns>
+    public int GetRemainingCancelTime()
+    {
+        TimeSpan elapsed = DateTime.Now - Timestamp;
+        double remaining = 120 - elapsed.TotalSeconds; // 2 minutes = 120 seconds
+        return remaining > 0 ? (int)remaining : 0;
+    }
+
+    /// <summary>
     /// Displays the ride's information to the console.
     /// </summary>
     public void Display()
