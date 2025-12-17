@@ -1,4 +1,5 @@
 using MinRide.Models;
+using MinRide.Utils;
 
 namespace MinRide.Managers;
 
@@ -139,24 +140,37 @@ public class RideManager
     {
         if (inProgressRides.Count == 0)
         {
-            Console.WriteLine("Không có chuyến đi nào đang di chuyển.");
+            Console.WriteLine("\nKhong co chuyen di nao dang di chuyen.");
             return;
         }
 
-        Console.WriteLine($"\n--- CHUYẾN ĐI ĐANG DI CHUYỂN ({inProgressRides.Count} chuyến) ---");
-        Console.WriteLine("┌─────┬─────────┬────────────┬────────────┬─────────────┬───────────────┬──────────────────┐");
-        Console.WriteLine("│ STT │ RideID  │ Khách hàng │  Tài xế    │ Quãng đường │    Giá cước   │ Còn lại          │");
-        Console.WriteLine("├─────┼─────────┼────────────┼────────────┼─────────────┼───────────────┼──────────────────┤");
+        // Define column widths
+        const int colSTT = 5, colRideID = 8, colCustomer = 12, colDriver = 10, colDistance = 11, colFare = 13, colRemain = 10;
+        int[] widths = { colSTT, colRideID, colCustomer, colDriver, colDistance, colFare, colRemain };
+        string separator = TableHelper.DrawSeparator(widths);
+        int totalWidth = widths.Sum() + (widths.Length * 3) - 1;
+        string title = $"CHUYEN DI DANG DI CHUYEN ({inProgressRides.Count} chuyen)";
+
+        Console.WriteLine();
+        Console.WriteLine(separator);
+        Console.WriteLine($"|{title.PadLeft((totalWidth + title.Length) / 2).PadRight(totalWidth)}|");
+        Console.WriteLine(separator);
+        Console.WriteLine($"| {"STT",colSTT} | {"RideID",colRideID} | {"Khach hang",-colCustomer} | {"Tai xe",-colDriver} | {"Quang duong",colDistance} | {"Gia cuoc",colFare} | {"Con lai",colRemain} |");
+        Console.WriteLine(separator);
 
         int stt = 1;
         foreach (var ride in inProgressRides)
         {
             int remaining = ride.GetRemainingTravelTime();
-            string remainingStr = remaining > 0 ? $"{remaining}s" : "Sắp xong";
-            Console.WriteLine($"│ {stt,3} │ {ride.RideId,7} │ C{ride.CustomerId,-9} │ D{ride.DriverId,-9} │ {ride.Distance,9:F1}km │ {ride.Fare,11:N0}đ │ {remainingStr,-16} │");
+            string remainingStr = remaining > 0 ? $"{remaining}s" : "Sap xong";
+            string customer = $"C{ride.CustomerId}";
+            string driver = $"D{ride.DriverId}";
+            string distance = $"{ride.Distance:F1} km";
+            string fare = $"{ride.Fare:N0} d";
+            Console.WriteLine($"| {stt,colSTT} | {ride.RideId,colRideID} | {customer,-colCustomer} | {driver,-colDriver} | {distance,colDistance} | {fare,colFare} | {remainingStr,colRemain} |");
             stt++;
         }
-        Console.WriteLine("└─────┴─────────┴────────────┴────────────┴─────────────┴───────────────┴──────────────────┘");
+        Console.WriteLine(separator);
     }
 
     /// <summary>
@@ -194,25 +208,38 @@ public class RideManager
 
         if (pendingRides.Count == 0)
         {
-            Console.WriteLine("Không có chuyến đi nào đang chờ.");
+            Console.WriteLine("\nKhong co chuyen di nao dang cho.");
             return;
         }
 
-        Console.WriteLine($"\n--- DANH SÁCH CHUYẾN ĐI ĐANG CHỜ ({pendingRides.Count} chuyến) ---");
-        Console.WriteLine("┌─────┬─────────┬────────────┬────────────┬─────────────┬───────────────┬──────────────────┐");
-        Console.WriteLine("│ STT │ RideID  │ Khách hàng │  Tài xế    │ Quãng đường │    Giá cước   │ Còn lại (hủy)    │");
-        Console.WriteLine("├─────┼─────────┼────────────┼────────────┼─────────────┼───────────────┼──────────────────┤");
+        // Define column widths
+        const int colSTT = 5, colRideID = 8, colCustomer = 12, colDriver = 10, colDistance = 11, colFare = 13, colRemain = 10;
+        int[] widths = { colSTT, colRideID, colCustomer, colDriver, colDistance, colFare, colRemain };
+        string separator = TableHelper.DrawSeparator(widths);
+        int totalWidth = widths.Sum() + (widths.Length * 3) - 1;
+        string title = $"CHUYEN DI DANG CHO ({pendingRides.Count} chuyen)";
+
+        Console.WriteLine();
+        Console.WriteLine(separator);
+        Console.WriteLine($"|{title.PadLeft((totalWidth + title.Length) / 2).PadRight(totalWidth)}|");
+        Console.WriteLine(separator);
+        Console.WriteLine($"| {"STT",colSTT} | {"RideID",colRideID} | {"Khach hang",-colCustomer} | {"Tai xe",-colDriver} | {"Quang duong",colDistance} | {"Gia cuoc",colFare} | {"Con lai",colRemain} |");
+        Console.WriteLine(separator);
 
         int stt = 1;
         foreach (var ride in pendingRides)
         {
             int remaining = ride.GetRemainingCancelTime();
-            string remainingStr = remaining > 0 ? $"{remaining}s" : "Hết hạn";
-            Console.WriteLine($"│ {stt,3} │ {ride.RideId,7} │ C{ride.CustomerId,-9} │ D{ride.DriverId,-9} │ {ride.Distance,9:F1}km │ {ride.Fare,11:N0}đ │ {remainingStr,-16} │");
+            string remainingStr = remaining > 0 ? $"{remaining}s" : "Het han";
+            string customer = $"C{ride.CustomerId}";
+            string driver = $"D{ride.DriverId}";
+            string distance = $"{ride.Distance:F1} km";
+            string fare = $"{ride.Fare:N0} d";
+            Console.WriteLine($"| {stt,colSTT} | {ride.RideId,colRideID} | {customer,-colCustomer} | {driver,-colDriver} | {distance,colDistance} | {fare,colFare} | {remainingStr,colRemain} |");
             stt++;
         }
-        Console.WriteLine("└─────┴─────────┴────────────┴────────────┴─────────────┴───────────────┴──────────────────┘");
-        Console.WriteLine("\n⚠ Chuyến đi sẽ tự động xác nhận sau 2 phút nếu không bị hủy.");
+        Console.WriteLine(separator);
+        Console.WriteLine("\n  * Chuyen di se tu dong bat dau sau 2 phut neu khong bi huy.");
     }
 
     /// <summary>

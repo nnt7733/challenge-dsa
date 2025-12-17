@@ -261,25 +261,48 @@ public class MinRideSystem
 
     private void DisplayAllDrivers()
     {
-        Console.WriteLine("\n--- DANH SÁCH TẤT CẢ TÀI XẾ ---");
         var drivers = driverManager.GetAll();
         if (drivers.Count == 0)
         {
-            Console.WriteLine("Chưa có tài xế nào trong hệ thống.");
+            Console.WriteLine("\nChua co tai xe nao trong he thong.");
             return;
         }
-        Console.WriteLine($"Tổng số: {drivers.Count} tài xế\n");
-        driverManager.DisplayAll();
+
+        // Define column widths
+        const int colSTT = 5, colID = 6, colName = 22, colRating = 8, colLocation = 15, colRides = 10;
+        int[] widths = { colSTT, colID, colName, colRating, colLocation, colRides };
+        string separator = TableHelper.DrawSeparator(widths);
+        int totalWidth = widths.Sum() + (widths.Length * 3) - 1;
+        string title = "DANH SACH TAT CA TAI XE";
+        string centeredTitle = title.PadLeft((totalWidth + title.Length) / 2).PadRight(totalWidth);
+
+        Console.WriteLine();
+        Console.WriteLine(separator);
+        Console.WriteLine($"|{centeredTitle}|");
+        Console.WriteLine(separator);
+        Console.WriteLine($"| {"STT",colSTT} | {"ID",colID} | {"Ten",-colName} | {"Rating",colRating} | {"Vi tri",-colLocation} | {"So chuyen",colRides} |");
+        Console.WriteLine(separator);
+
+        int stt = 1;
+        foreach (var d in drivers)
+        {
+            string name = TableHelper.TruncateString(d.Name, colName);
+            string location = $"({d.Location.X,4:F1},{d.Location.Y,4:F1})";
+            Console.WriteLine($"| {stt,colSTT} | {d.Id,colID} | {name,-colName} | {d.Rating,colRating:F1} | {location,-colLocation} | {d.TotalRides,colRides} |");
+            stt++;
+        }
+        Console.WriteLine(separator);
+        Console.WriteLine($"  Tong so: {drivers.Count} tai xe");
     }
 
     private void DisplayTopKDrivers(bool highest)
     {
-        string label = highest ? "RATING CAO NHẤT" : "RATING THẤP NHẤT";
-        Console.Write($"Nhập số lượng K (Top K {label}): ");
+        string label = highest ? "RATING CAO NHAT" : "RATING THAP NHAT";
+        Console.Write($"Nhap so luong K (Top K {label}): ");
 
         if (!TryReadInt(out int k) || k <= 0)
         {
-            Console.WriteLine("K phải là số nguyên dương.");
+            Console.WriteLine("K phai la so nguyen duong.");
             return;
         }
 
@@ -287,23 +310,33 @@ public class MinRideSystem
 
         if (topDrivers.Count == 0)
         {
-            Console.WriteLine("Không có tài xế nào.");
+            Console.WriteLine("Khong co tai xe nao.");
             return;
         }
 
-        Console.WriteLine($"\n--- TOP {topDrivers.Count} TÀI XẾ {label} ---");
-        Console.WriteLine("┌─────┬────────┬────────────────────────┬────────┬─────────────────┬───────────┐");
-        Console.WriteLine("│ STT │   ID   │          Tên           │ Rating │     Vị trí      │ Số chuyến │");
-        Console.WriteLine("├─────┼────────┼────────────────────────┼────────┼─────────────────┼───────────┤");
+        // Define column widths
+        const int colSTT = 5, colID = 6, colName = 22, colRating = 8, colLocation = 15, colRides = 10;
+        int[] widths = { colSTT, colID, colName, colRating, colLocation, colRides };
+        string separator = TableHelper.DrawSeparator(widths);
+        int totalWidth = widths.Sum() + (widths.Length * 3) - 1;
+        string title = $"TOP {topDrivers.Count} TAI XE {label}";
+
+        Console.WriteLine();
+        Console.WriteLine(separator);
+        Console.WriteLine($"|{title.PadLeft((totalWidth + title.Length) / 2).PadRight(totalWidth)}|");
+        Console.WriteLine(separator);
+        Console.WriteLine($"| {"STT",colSTT} | {"ID",colID} | {"Ten",-colName} | {"Rating",colRating} | {"Vi tri",-colLocation} | {"So chuyen",colRides} |");
+        Console.WriteLine(separator);
 
         int stt = 1;
         foreach (var d in topDrivers)
         {
-            string name = d.Name.Length > 22 ? d.Name.Substring(0, 19) + "..." : d.Name;
-            Console.WriteLine($"│ {stt,3} │ {d.Id,6} │ {name,-22} │ {d.Rating,6:F1} │ ({d.Location.X:F1}, {d.Location.Y:F1}){"",-5} │ {d.TotalRides,9} │");
+            string name = TableHelper.TruncateString(d.Name, colName);
+            string location = $"({d.Location.X,4:F1},{d.Location.Y,4:F1})";
+            Console.WriteLine($"| {stt,colSTT} | {d.Id,colID} | {name,-colName} | {d.Rating,colRating:F1} | {location,-colLocation} | {d.TotalRides,colRides} |");
             stt++;
         }
-        Console.WriteLine("└─────┴────────┴────────────────────────┴────────┴─────────────────┴───────────┘");
+        Console.WriteLine(separator);
     }
 
     private void AddDriverWithValidation()
@@ -594,12 +627,12 @@ public class MinRideSystem
 
     private void SearchDriverByName()
     {
-        Console.Write("Nhập tên tài xế cần tìm: ");
+        Console.Write("Nhap ten tai xe can tim: ");
         string? name = Console.ReadLine()?.Trim();
 
         if (string.IsNullOrEmpty(name))
         {
-            Console.WriteLine("Tên không được để trống.");
+            Console.WriteLine("Ten khong duoc de trong.");
             return;
         }
 
@@ -607,23 +640,33 @@ public class MinRideSystem
 
         if (drivers.Count == 0)
         {
-            Console.WriteLine($"Không tìm thấy tài xế nào có tên chứa \"{name}\".");
+            Console.WriteLine($"Khong tim thay tai xe nao co ten chua \"{name}\".");
             return;
         }
 
-        Console.WriteLine($"\n--- TÌM THẤY {drivers.Count} TÀI XẾ ---");
-        Console.WriteLine("┌─────┬────────┬────────────────────────┬────────┬─────────────────┬───────────┐");
-        Console.WriteLine("│ STT │   ID   │          Tên           │ Rating │     Vị trí      │ Số chuyến │");
-        Console.WriteLine("├─────┼────────┼────────────────────────┼────────┼─────────────────┼───────────┤");
+        // Define column widths
+        const int colSTT = 5, colID = 6, colName = 22, colRating = 8, colLocation = 15, colRides = 10;
+        int[] widths = { colSTT, colID, colName, colRating, colLocation, colRides };
+        string separator = TableHelper.DrawSeparator(widths);
+        int totalWidth = widths.Sum() + (widths.Length * 3) - 1;
+        string title = $"TIM THAY {drivers.Count} TAI XE";
+
+        Console.WriteLine();
+        Console.WriteLine(separator);
+        Console.WriteLine($"|{title.PadLeft((totalWidth + title.Length) / 2).PadRight(totalWidth)}|");
+        Console.WriteLine(separator);
+        Console.WriteLine($"| {"STT",colSTT} | {"ID",colID} | {"Ten",-colName} | {"Rating",colRating} | {"Vi tri",-colLocation} | {"So chuyen",colRides} |");
+        Console.WriteLine(separator);
 
         int stt = 1;
         foreach (var d in drivers)
         {
-            string driverName = d.Name.Length > 22 ? d.Name.Substring(0, 19) + "..." : d.Name;
-            Console.WriteLine($"│ {stt,3} │ {d.Id,6} │ {driverName,-22} │ {d.Rating,6:F1} │ ({d.Location.X:F1}, {d.Location.Y:F1}){"",-5} │ {d.TotalRides,9} │");
+            string driverName = TableHelper.TruncateString(d.Name, colName);
+            string location = $"({d.Location.X,4:F1},{d.Location.Y,4:F1})";
+            Console.WriteLine($"| {stt,colSTT} | {d.Id,colID} | {driverName,-colName} | {d.Rating,colRating:F1} | {location,-colLocation} | {d.TotalRides,colRides} |");
             stt++;
         }
-        Console.WriteLine("└─────┴────────┴────────────────────────┴────────┴─────────────────┴───────────┘");
+        Console.WriteLine(separator);
     }
 
     private void SearchDriverById()
@@ -751,38 +794,49 @@ public class MinRideSystem
 
     private void DisplayAllCustomers()
     {
-        Console.WriteLine("\n--- DANH SÁCH TẤT CẢ KHÁCH HÀNG ---");
         var customers = customerManager.GetAll();
         if (customers.Count == 0)
         {
-            Console.WriteLine("Chưa có khách hàng nào trong hệ thống.");
+            Console.WriteLine("\nChua co khach hang nao trong he thong.");
             return;
         }
-        Console.WriteLine($"Tổng số: {customers.Count} khách hàng\n");
 
-        Console.WriteLine("┌─────┬────────┬────────────────────────┬────────────────┬─────────────────┐");
-        Console.WriteLine("│ STT │   ID   │          Tên           │   Quận/Huyện   │     Vị trí      │");
-        Console.WriteLine("├─────┼────────┼────────────────────────┼────────────────┼─────────────────┤");
+        // Define column widths
+        const int colSTT = 5, colID = 6, colName = 22, colDistrict = 16, colLocation = 15;
+        int[] widths = { colSTT, colID, colName, colDistrict, colLocation };
+        string separator = TableHelper.DrawSeparator(widths);
+        int totalWidth = widths.Sum() + (widths.Length * 3) - 1;
+        string title = "DANH SACH TAT CA KHACH HANG";
+        string centeredTitle = title.PadLeft((totalWidth + title.Length) / 2).PadRight(totalWidth);
+
+        Console.WriteLine();
+        Console.WriteLine(separator);
+        Console.WriteLine($"|{centeredTitle}|");
+        Console.WriteLine(separator);
+        Console.WriteLine($"| {"STT",colSTT} | {"ID",colID} | {"Ten",-colName} | {"Quan/Huyen",-colDistrict} | {"Vi tri",-colLocation} |");
+        Console.WriteLine(separator);
 
         int stt = 1;
         foreach (var c in customers)
         {
-            string name = c.Name.Length > 22 ? c.Name.Substring(0, 19) + "..." : c.Name;
-            string district = c.District.Length > 14 ? c.District.Substring(0, 11) + "..." : c.District;
-            Console.WriteLine($"│ {stt,3} │ {c.Id,6} │ {name,-22} │ {district,-14} │ ({c.Location.X:F1}, {c.Location.Y:F1}){"",-5} │");
+            string name = TableHelper.TruncateString(c.Name, colName);
+            string district = TableHelper.TruncateString(c.District, colDistrict);
+            string location = $"({c.Location.X,4:F1},{c.Location.Y,4:F1})";
+            Console.WriteLine($"| {stt,colSTT} | {c.Id,colID} | {name,-colName} | {district,-colDistrict} | {location,-colLocation} |");
             stt++;
         }
-        Console.WriteLine("└─────┴────────┴────────────────────────┴────────────────┴─────────────────┘");
+        Console.WriteLine(separator);
+        Console.WriteLine($"  Tong so: {customers.Count} khach hang");
     }
 
     private void DisplayTopKCustomers(bool highest)
     {
-        string label = highest ? "ID CAO NHẤT" : "ID THẤP NHẤT";
-        Console.Write($"Nhập số lượng K (Top K {label}): ");
+        string label = highest ? "ID CAO NHAT" : "ID THAP NHAT";
+        Console.Write($"Nhap so luong K (Top K {label}): ");
 
         if (!TryReadInt(out int k) || k <= 0)
         {
-            Console.WriteLine("K phải là số nguyên dương.");
+            Console.WriteLine("K phai la so nguyen duong.");
             return;
         }
 
@@ -790,24 +844,34 @@ public class MinRideSystem
 
         if (topCustomers.Count == 0)
         {
-            Console.WriteLine("Không có khách hàng nào.");
+            Console.WriteLine("Khong co khach hang nao.");
             return;
         }
 
-        Console.WriteLine($"\n--- TOP {topCustomers.Count} KHÁCH HÀNG {label} ---");
-        Console.WriteLine("┌─────┬────────┬────────────────────────┬────────────────┬─────────────────┐");
-        Console.WriteLine("│ STT │   ID   │          Tên           │   Quận/Huyện   │     Vị trí      │");
-        Console.WriteLine("├─────┼────────┼────────────────────────┼────────────────┼─────────────────┤");
+        // Define column widths
+        const int colSTT = 5, colID = 6, colName = 22, colDistrict = 16, colLocation = 15;
+        int[] widths = { colSTT, colID, colName, colDistrict, colLocation };
+        string separator = TableHelper.DrawSeparator(widths);
+        int totalWidth = widths.Sum() + (widths.Length * 3) - 1;
+        string title = $"TOP {topCustomers.Count} KHACH HANG {label}";
+
+        Console.WriteLine();
+        Console.WriteLine(separator);
+        Console.WriteLine($"|{title.PadLeft((totalWidth + title.Length) / 2).PadRight(totalWidth)}|");
+        Console.WriteLine(separator);
+        Console.WriteLine($"| {"STT",colSTT} | {"ID",colID} | {"Ten",-colName} | {"Quan/Huyen",-colDistrict} | {"Vi tri",-colLocation} |");
+        Console.WriteLine(separator);
 
         int stt = 1;
         foreach (var c in topCustomers)
         {
-            string name = c.Name.Length > 22 ? c.Name.Substring(0, 19) + "..." : c.Name;
-            string district = c.District.Length > 14 ? c.District.Substring(0, 11) + "..." : c.District;
-            Console.WriteLine($"│ {stt,3} │ {c.Id,6} │ {name,-22} │ {district,-14} │ ({c.Location.X:F1}, {c.Location.Y:F1}){"",-5} │");
+            string name = TableHelper.TruncateString(c.Name, colName);
+            string district = TableHelper.TruncateString(c.District, colDistrict);
+            string location = $"({c.Location.X,4:F1},{c.Location.Y,4:F1})";
+            Console.WriteLine($"| {stt,colSTT} | {c.Id,colID} | {name,-colName} | {district,-colDistrict} | {location,-colLocation} |");
             stt++;
         }
-        Console.WriteLine("└─────┴────────┴────────────────────────┴────────────────┴─────────────────┘");
+        Console.WriteLine(separator);
     }
 
     private void AddCustomerWithValidation()
@@ -927,12 +991,12 @@ public class MinRideSystem
 
     private void SearchCustomerByName()
     {
-        Console.Write("Nhập tên khách hàng cần tìm: ");
+        Console.Write("Nhap ten khach hang can tim: ");
         string? name = Console.ReadLine()?.Trim();
 
         if (string.IsNullOrEmpty(name))
         {
-            Console.WriteLine("Tên không được để trống.");
+            Console.WriteLine("Ten khong duoc de trong.");
             return;
         }
 
@@ -940,24 +1004,34 @@ public class MinRideSystem
 
         if (customers.Count == 0)
         {
-            Console.WriteLine($"Không tìm thấy khách hàng nào có tên chứa \"{name}\".");
+            Console.WriteLine($"Khong tim thay khach hang nao co ten chua \"{name}\".");
             return;
         }
 
-        Console.WriteLine($"\n--- TÌM THẤY {customers.Count} KHÁCH HÀNG ---");
-        Console.WriteLine("┌─────┬────────┬────────────────────────┬────────────────┬─────────────────┐");
-        Console.WriteLine("│ STT │   ID   │          Tên           │   Quận/Huyện   │     Vị trí      │");
-        Console.WriteLine("├─────┼────────┼────────────────────────┼────────────────┼─────────────────┤");
+        // Define column widths
+        const int colSTT = 5, colID = 6, colName = 22, colDistrict = 16, colLocation = 15;
+        int[] widths = { colSTT, colID, colName, colDistrict, colLocation };
+        string separator = TableHelper.DrawSeparator(widths);
+        int totalWidth = widths.Sum() + (widths.Length * 3) - 1;
+        string title = $"TIM THAY {customers.Count} KHACH HANG";
+
+        Console.WriteLine();
+        Console.WriteLine(separator);
+        Console.WriteLine($"|{title.PadLeft((totalWidth + title.Length) / 2).PadRight(totalWidth)}|");
+        Console.WriteLine(separator);
+        Console.WriteLine($"| {"STT",colSTT} | {"ID",colID} | {"Ten",-colName} | {"Quan/Huyen",-colDistrict} | {"Vi tri",-colLocation} |");
+        Console.WriteLine(separator);
 
         int stt = 1;
         foreach (var c in customers)
         {
-            string customerName = c.Name.Length > 22 ? c.Name.Substring(0, 19) + "..." : c.Name;
-            string district = c.District.Length > 14 ? c.District.Substring(0, 11) + "..." : c.District;
-            Console.WriteLine($"│ {stt,3} │ {c.Id,6} │ {customerName,-22} │ {district,-14} │ ({c.Location.X:F1}, {c.Location.Y:F1}){"",-5} │");
+            string customerName = TableHelper.TruncateString(c.Name, colName);
+            string district = TableHelper.TruncateString(c.District, colDistrict);
+            string location = $"({c.Location.X,4:F1},{c.Location.Y,4:F1})";
+            Console.WriteLine($"| {stt,colSTT} | {c.Id,colID} | {customerName,-colName} | {district,-colDistrict} | {location,-colLocation} |");
             stt++;
         }
-        Console.WriteLine("└─────┴────────┴────────────────────────┴────────────────┴─────────────────┘");
+        Console.WriteLine(separator);
     }
 
     private void SearchCustomerById()
@@ -1000,25 +1074,35 @@ public class MinRideSystem
 
         if (districts.Count == 0)
         {
-            Console.WriteLine("Chưa có dữ liệu quận/huyện.");
+            Console.WriteLine("\nChua co du lieu quan/huyen.");
             return;
         }
 
-        Console.WriteLine("\n--- DANH SÁCH QUẬN/HUYỆN ---");
-        Console.WriteLine("┌─────┬────────────────────────┬─────────────────┐");
-        Console.WriteLine("│ STT │      Quận/Huyện        │ Số khách hàng   │");
-        Console.WriteLine("├─────┼────────────────────────┼─────────────────┤");
+        // Define column widths
+        const int colSTT = 5, colDistrict = 24, colCount = 15;
+        int[] widths = { colSTT, colDistrict, colCount };
+        string separator = TableHelper.DrawSeparator(widths);
+        int totalWidth = widths.Sum() + (widths.Length * 3) - 1;
+        string title = "DANH SACH QUAN/HUYEN";
+        string centeredTitle = title.PadLeft((totalWidth + title.Length) / 2).PadRight(totalWidth);
+
+        Console.WriteLine();
+        Console.WriteLine(separator);
+        Console.WriteLine($"|{centeredTitle}|");
+        Console.WriteLine(separator);
+        Console.WriteLine($"| {"STT",colSTT} | {"Quan/Huyen",-colDistrict} | {"So khach hang",colCount} |");
+        Console.WriteLine(separator);
 
         int stt = 1;
         foreach (var district in districts.OrderBy(d => d))
         {
             int count = customerManager.GetDistrictCount(district);
-            string districtName = district.Length > 22 ? district.Substring(0, 19) + "..." : district;
-            Console.WriteLine($"│ {stt,3} │ {districtName,-22} │ {count,15} │");
+            string districtName = TableHelper.TruncateString(district, colDistrict);
+            Console.WriteLine($"| {stt,colSTT} | {districtName,-colDistrict} | {count,colCount} |");
             stt++;
         }
-        Console.WriteLine("└─────┴────────────────────────┴─────────────────┘");
-        Console.WriteLine($"\nTổng: {districts.Count} quận/huyện");
+        Console.WriteLine(separator);
+        Console.WriteLine($"  Tong: {districts.Count} quan/huyen");
     }
 
     /// <summary>
@@ -1027,6 +1111,8 @@ public class MinRideSystem
     private void ManageRides()
     {
         bool back = false;
+        const int menuWidth = 58;
+        string menuSep = "+" + new string('-', menuWidth) + "+";
 
         while (!back)
         {
@@ -1035,22 +1121,24 @@ public class MinRideSystem
 
             // Show current status summary
             var (pending, inProgress, completed) = rideManager.GetRideCounts();
+            string title = "QUAN LY CHUYEN DI";
+            string status = $"Trang thai: {pending} cho | {inProgress} dang chay | {completed} hoan thanh";
             
             Console.WriteLine();
-            Console.WriteLine("┌──────────────────────────────────────────────────────────────┐");
-            Console.WriteLine("│                    QUẢN LÝ CHUYẾN ĐI                         │");
-            Console.WriteLine("├──────────────────────────────────────────────────────────────┤");
-            Console.WriteLine($"│  Trạng thái: {pending} chờ | {inProgress} đang chạy | {completed} hoàn thành{"",-12} │");
-            Console.WriteLine("├──────────────────────────────────────────────────────────────┤");
-            Console.WriteLine("│  1. Xem lịch sử chuyến đi của tài xế                         │");
-            Console.WriteLine("│  2. Xem các chuyến đi đang chờ (PENDING)                     │");
-            Console.WriteLine("│  3. Xem các chuyến đi đang di chuyển (IN_PROGRESS)           │");
-            Console.WriteLine("│  4. Bắt đầu tất cả chuyến đi đang chờ                        │");
-            Console.WriteLine("│  5. Hủy chuyến đi (trong vòng 2 phút)                        │");
-            Console.WriteLine("│  6. Quay lại                                                 │");
-            Console.WriteLine("└──────────────────────────────────────────────────────────────┘");
-            Console.WriteLine("  ℹ 1km = 15 giây di chuyển | Có thể hủy trong 2 phút đầu");
-            Console.Write("\nChọn chức năng: ");
+            Console.WriteLine(menuSep);
+            Console.WriteLine($"|{title.PadLeft((menuWidth + title.Length) / 2).PadRight(menuWidth)}|");
+            Console.WriteLine(menuSep);
+            Console.WriteLine($"| {status,-56} |");
+            Console.WriteLine(menuSep);
+            Console.WriteLine($"| {"1. Xem lich su chuyen di cua tai xe",-56} |");
+            Console.WriteLine($"| {"2. Xem cac chuyen di dang cho (PENDING)",-56} |");
+            Console.WriteLine($"| {"3. Xem cac chuyen di dang di chuyen (IN_PROGRESS)",-56} |");
+            Console.WriteLine($"| {"4. Bat dau tat ca chuyen di dang cho",-56} |");
+            Console.WriteLine($"| {"5. Huy chuyen di (trong vong 2 phut)",-56} |");
+            Console.WriteLine($"| {"6. Quay lai",-56} |");
+            Console.WriteLine(menuSep);
+            Console.WriteLine("  * 1km = 15 giay | Co the huy trong 2 phut dau");
+            Console.Write("\nChon chuc nang: ");
 
             string? choice = Console.ReadLine();
 
@@ -1879,29 +1967,36 @@ public class MinRideSystem
 
     private void ViewDriverRideHistory()
     {
-        Console.Write("Nhập ID tài xế: ");
+        Console.Write("Nhap ID tai xe: ");
         if (!TryReadInt(out int driverId))
         {
-            Console.WriteLine("ID không hợp lệ.");
+            Console.WriteLine("ID khong hop le.");
             return;
         }
 
         var driver = driverManager.FindDriverById(driverId);
         if (driver == null)
         {
-            Console.WriteLine("Không tìm thấy tài xế với ID này.");
+            Console.WriteLine("Khong tim thay tai xe voi ID nay.");
             return;
         }
 
-        Console.WriteLine("\n╔══════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║                    THÔNG TIN TÀI XẾ                          ║");
-        Console.WriteLine("╠══════════════════════════════════════════════════════════════╣");
-        Console.WriteLine($"║  ID:              {driver.Id,-42} ║");
-        Console.WriteLine($"║  Tên:             {driver.Name,-42} ║");
-        Console.WriteLine($"║  Rating:          {driver.Rating:F1} ★{"",-38} ║");
-        Console.WriteLine($"║  Vị trí:          ({driver.Location.X:F1}, {driver.Location.Y:F1}){"",-32} ║");
-        Console.WriteLine($"║  Tổng số chuyến:  {driver.TotalRides,-42} ║");
-        Console.WriteLine("╚══════════════════════════════════════════════════════════════╝");
+        // Define column widths for driver info
+        const int infoWidth = 42;
+        string infoSep = "+" + new string('-', infoWidth) + "+";
+        string infoTitle = "THONG TIN TAI XE";
+        const int labelWidth = 18, valueWidth = 22;
+
+        Console.WriteLine();
+        Console.WriteLine(infoSep);
+        Console.WriteLine($"|{infoTitle.PadLeft((infoWidth + infoTitle.Length) / 2).PadRight(infoWidth)}|");
+        Console.WriteLine(infoSep);
+        Console.WriteLine($"| {"ID:",-labelWidth}{driver.Id,valueWidth} |");
+        Console.WriteLine($"| {"Ten:",-labelWidth}{TableHelper.TruncateString(driver.Name, valueWidth),valueWidth} |");
+        Console.WriteLine($"| {"Rating:",-labelWidth}{$"{driver.Rating:F1}/5.0",valueWidth} |");
+        Console.WriteLine($"| {"Vi tri:",-labelWidth}{$"({driver.Location.X:F1}, {driver.Location.Y:F1})",valueWidth} |");
+        Console.WriteLine($"| {"Tong so chuyen:",-labelWidth}{driver.TotalRides,valueWidth} |");
+        Console.WriteLine(infoSep);
 
         // Get all completed rides sorted by timestamp (ascending - oldest first)
         var rides = rideManager.GetRidesByDriver(driverId)
@@ -1911,16 +2006,23 @@ public class MinRideSystem
 
         if (rides.Count == 0)
         {
-            Console.WriteLine("\nTài xế này chưa có chuyến đi đã hoàn thành nào.");
+            Console.WriteLine("\nTai xe nay chua co chuyen di da hoan thanh nao.");
             return;
         }
 
-        // Display rides in table format (without Status and Time columns)
-        Console.WriteLine($"\n╔══════════════════════════════════════════════════════════════════════════════╗");
-        Console.WriteLine($"║      DANH SÁCH CHUYẾN ĐI ĐÃ HOÀN THÀNH CỦA TÀI XẾ D{driverId,-24} ║");
-        Console.WriteLine($"╠══════════════════════════════════════════════════════════════════════════════╣");
-        Console.WriteLine("║  STT  │  RideID  │  Khách hàng  │  Quãng đường      │  Giá cước              ║");
-        Console.WriteLine("╠═══════╪══════════╪══════════════╪═══════════════════╪════════════════════════╣");
+        // Define column widths for ride history
+        const int colSTT = 5, colRideID = 10, colCustomer = 14, colDistance = 13, colFare = 16;
+        int[] widths = { colSTT, colRideID, colCustomer, colDistance, colFare };
+        string separator = TableHelper.DrawSeparator(widths);
+        int totalWidth = widths.Sum() + (widths.Length * 3) - 1;
+        string historyTitle = "LICH SU CHUYEN DI";
+
+        Console.WriteLine();
+        Console.WriteLine(separator);
+        Console.WriteLine($"|{historyTitle.PadLeft((totalWidth + historyTitle.Length) / 2).PadRight(totalWidth)}|");
+        Console.WriteLine(separator);
+        Console.WriteLine($"| {"STT",colSTT} | {"RideID",colRideID} | {"Khach hang",-colCustomer} | {"Quang duong",colDistance} | {"Gia cuoc",colFare} |");
+        Console.WriteLine(separator);
 
         int stt = 1;
         double totalDistance = 0;
@@ -1928,15 +2030,21 @@ public class MinRideSystem
 
         foreach (var ride in rides)
         {
-            Console.WriteLine($"║  {stt,3}  │  {ride.RideId,6}  │  C{ride.CustomerId,-10} │  {ride.Distance,13:F1} km  │  {ride.Fare,18:N0} đ  ║");
+            string customer = $"C{ride.CustomerId}";
+            string distance = $"{ride.Distance:F1} km";
+            string fare = $"{ride.Fare:N0} d";
+            Console.WriteLine($"| {stt,colSTT} | {ride.RideId,colRideID} | {customer,-colCustomer} | {distance,colDistance} | {fare,colFare} |");
             totalDistance += ride.Distance;
             totalFare += ride.Fare;
             stt++;
         }
 
-        Console.WriteLine("╠═══════╧══════════╧══════════════╧═══════════════════╧════════════════════════╣");
-        Console.WriteLine($"║  TỔNG CỘNG: {rides.Count} chuyến  │  {totalDistance,13:F1} km  │  {totalFare,18:N0} đ  ║");
-        Console.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        Console.WriteLine(separator);
+        string sumLabel = $"TONG: {rides.Count} chuyen";
+        string sumDistance = $"{totalDistance:F1} km";
+        string sumFare = $"{totalFare:N0} d";
+        Console.WriteLine($"| {sumLabel,-colSTT + colRideID + 3} | {"",colCustomer} | {sumDistance,colDistance} | {sumFare,colFare} |");
+        Console.WriteLine(separator);
     }
 
     #endregion
