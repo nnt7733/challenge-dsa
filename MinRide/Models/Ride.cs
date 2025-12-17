@@ -2,9 +2,15 @@ namespace MinRide.Models;
 
 /// <summary>
 /// Represents a ride in the MinRide system.
+/// Status flow: PENDING → IN_PROGRESS → COMPLETED (or CANCELLED)
 /// </summary>
 public class Ride
 {
+    /// <summary>
+    /// Speed constant: 1km = 15 seconds of travel time.
+    /// </summary>
+    public const int SECONDS_PER_KM = 15;
+
     /// <summary>
     /// Gets or sets the unique identifier for the ride.
     /// </summary>
@@ -31,12 +37,22 @@ public class Ride
     public double Fare { get; set; }
 
     /// <summary>
-    /// Gets or sets the timestamp when the ride was created.
+    /// Gets or sets the timestamp when the ride was created/booked.
     /// </summary>
     public DateTime Timestamp { get; set; }
 
     /// <summary>
-    /// Gets or sets the current status of the ride (PENDING, CONFIRMED, CANCELLED).
+    /// Gets or sets the timestamp when the ride started (IN_PROGRESS).
+    /// </summary>
+    public DateTime? StartTime { get; set; }
+
+    /// <summary>
+    /// Gets or sets the expected completion time based on distance.
+    /// </summary>
+    public DateTime? ExpectedCompletionTime { get; set; }
+
+    /// <summary>
+    /// Gets or sets the current status of the ride (PENDING, IN_PROGRESS, COMPLETED, CANCELLED).
     /// </summary>
     public string Status { get; set; }
 
@@ -84,11 +100,31 @@ public class Ride
     }
 
     /// <summary>
-    /// Confirms the ride by setting the status to "CONFIRMED".
+    /// Starts the ride - sets status to IN_PROGRESS and calculates completion time.
+    /// </summary>
+    public void Start()
+    {
+        Status = "IN_PROGRESS";
+        StartTime = DateTime.Now;
+        // Calculate expected completion time: distance * 15 seconds per km
+        int travelSeconds = (int)(Distance * SECONDS_PER_KM);
+        ExpectedCompletionTime = StartTime.Value.AddSeconds(travelSeconds);
+    }
+
+    /// <summary>
+    /// Completes the ride by setting the status to "COMPLETED".
+    /// </summary>
+    public void Complete()
+    {
+        Status = "COMPLETED";
+    }
+
+    /// <summary>
+    /// Confirms the ride (legacy - now starts the ride).
     /// </summary>
     public void Confirm()
     {
-        Status = "CONFIRMED";
+        Start();
     }
 
     /// <summary>
@@ -109,7 +145,48 @@ public class Ride
     }
 
     /// <summary>
-    /// Checks if the ride can be cancelled (within 2 minutes of creation).
+    /// Checks if the ride is in progress (driver is traveling).
+    /// </summary>
+    /// <returns><c>true</c> if the ride status is "IN_PROGRESS"; otherwise, <c>false</c>.</returns>
+    public bool IsInProgress()
+    {
+        return Status == "IN_PROGRESS";
+    }
+
+    /// <summary>
+    /// Checks if the ride has finished traveling (ready to complete).
+    /// </summary>
+    /// <returns><c>true</c> if ride is in progress and travel time has elapsed; otherwise, <c>false</c>.</returns>
+    public bool HasFinishedTraveling()
+    {
+        if (Status != "IN_PROGRESS" || !ExpectedCompletionTime.HasValue)
+            return false;
+        return DateTime.Now >= ExpectedCompletionTime.Value;
+    }
+
+    /// <summary>
+    /// Gets remaining travel time in seconds.
+    /// </summary>
+    /// <returns>Remaining seconds, or 0 if completed/not started.</returns>
+    public int GetRemainingTravelTime()
+    {
+        if (Status != "IN_PROGRESS" || !ExpectedCompletionTime.HasValue)
+            return 0;
+        TimeSpan remaining = ExpectedCompletionTime.Value - DateTime.Now;
+        return remaining.TotalSeconds > 0 ? (int)remaining.TotalSeconds : 0;
+    }
+
+    /// <summary>
+    /// Gets total travel time in seconds for this ride.
+    /// </summary>
+    /// <returns>Total seconds based on distance.</returns>
+    public int GetTotalTravelTime()
+    {
+        return (int)(Distance * SECONDS_PER_KM);
+    }
+
+    /// <summary>
+    /// Checks if the ride can be cancelled (within 2 minutes of creation and still PENDING).
     /// </summary>
     /// <returns><c>true</c> if the ride can be cancelled; otherwise, <c>false</c>.</returns>
     public bool CanBeCancelled()
@@ -120,7 +197,7 @@ public class Ride
     }
 
     /// <summary>
-    /// Gets the remaining time in seconds before the ride is auto-confirmed.
+    /// Gets the remaining time in seconds before the ride auto-starts.
     /// </summary>
     /// <returns>Remaining seconds, or 0 if already expired.</returns>
     public int GetRemainingCancelTime()
@@ -135,16 +212,25 @@ public class Ride
     /// </summary>
     public void Display()
     {
-        Console.WriteLine($"RideID: {RideId} | Customer: C{CustomerId} | Driver: D{DriverId} | Distance: {Distance:F1}km | Fare: {Fare:N0} VND | Status: {Status} | Time: {Timestamp:dd/MM/yyyy HH:mm:ss}");
+        string statusInfo = Status;
+        if (Status == "IN_PROGRESS")
+        {
+            int remaining = GetRemainingTravelTime();
+            statusInfo = $"IN_PROGRESS ({remaining}s còn lại)";
+        }
+        Console.WriteLine($"RideID: {RideId} | Customer: C{CustomerId} | Driver: D{DriverId} | Distance: {Distance:F1}km | Fare: {Fare:N0} VND | Status: {statusInfo}");
     }
 
     /// <summary>
     /// Converts the ride's data to a CSV-formatted string.
+    /// Only saves COMPLETED rides to CSV.
     /// </summary>
     /// <returns>A comma-separated string containing the ride's data.</returns>
     public string ToCSV()
     {
-        return $"{RideId},{CustomerId},{DriverId},{Distance},{Fare},{Timestamp:O},{Status}";
+        // Save as CONFIRMED for backward compatibility (COMPLETED rides)
+        string saveStatus = Status == "COMPLETED" ? "CONFIRMED" : Status;
+        return $"{RideId},{CustomerId},{DriverId},{Distance},{Fare},{Timestamp:O},{saveStatus}";
     }
 
     /// <summary>
@@ -165,6 +251,9 @@ public class Ride
             double fare = double.Parse(parts[4]);
             DateTime timestamp = DateTime.Parse(parts[5]);
             string status = parts[6];
+
+            // Convert CONFIRMED to COMPLETED for new logic
+            if (status == "CONFIRMED") status = "COMPLETED";
 
             return new Ride(rideId, customerId, driverId, distance, fare, timestamp, status);
         }

@@ -106,7 +106,7 @@ public static class DataGenerator
     public static List<Ride> GenerateRides(int count, int maxCustomerId, int maxDriverId)
     {
         var rides = new List<Ride>();
-        var statuses = new[] { "CONFIRMED", "CONFIRMED", "CONFIRMED", "CANCELLED" }; // 75% confirmed
+        var statuses = new[] { "COMPLETED", "COMPLETED", "COMPLETED", "CANCELLED" }; // 75% completed
 
         for (int i = 1; i <= count; i++)
         {
@@ -140,7 +140,7 @@ public static class DataGenerator
 
         // Sync driver's TotalRides with actual confirmed rides
         var driverDict = drivers.ToDictionary(d => d.Id);
-        foreach (var ride in rides.Where(r => r.Status == "CONFIRMED"))
+        foreach (var ride in rides.Where(r => r.Status == "COMPLETED"))
         {
             if (driverDict.TryGetValue(ride.DriverId, out var driver))
             {

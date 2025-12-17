@@ -2,32 +2,42 @@
 
 ## Mô tả
 
-MinRide là hệ thống quản lý đặt xe công nghệ được xây dựng bằng C# (.NET 7.0). Hệ thống hỗ trợ Admin quản lý dữ liệu tài xế, khách hàng, chuyến đi và xử lý đặt xe thông minh.
+MinRide là hệ thống quản lý đặt xe công nghệ được xây dựng bằng C# (.NET 8.0). Hệ thống hỗ trợ Admin quản lý dữ liệu tài xế, khách hàng, chuyến đi và xử lý đặt xe thông minh với mô phỏng thời gian di chuyển thực tế.
 
 ## Yêu cầu hệ thống
 
-- .NET SDK 7.0 trở lên
+- .NET SDK 8.0 trở lên
 - Windows/macOS/Linux
 
 ## Cài đặt và chạy
 
-### 1. Clone hoặc tải project
-
 ```bash
 cd MinRide
-```
-
-### 2. Khôi phục packages
-
-```bash
 dotnet restore
-```
-
-### 3. Chạy chương trình
-
-```bash
 dotnet run
 ```
+
+## Luồng xử lý chuyến đi (Ride Flow)
+
+```
+┌─────────────┐      2 phút      ┌──────────────┐    distance×15s    ┌───────────────┐
+│   PENDING   │ ───────────────► │ IN_PROGRESS  │ ─────────────────► │   COMPLETED   │
+│ (Đang chờ)  │   auto-start     │ (Đang chạy)  │    auto-complete   │ (Hoàn thành)  │
+└─────────────┘                  └──────────────┘                    └───────────────┘
+      │                                                                      │
+      │ Hủy trong 2 phút                                                     │
+      ▼                                                                      ▼
+┌─────────────┐                                                      Lưu vào CSV
+│  CANCELLED  │                                                      TotalRides++
+│   (Đã hủy)  │
+└─────────────┘
+```
+
+### Quy tắc:
+- **PENDING → IN_PROGRESS**: Sau 2 phút hoặc xác nhận thủ công
+- **IN_PROGRESS → COMPLETED**: Sau `distance × 15 giây` (1km = 15s)
+- **Hủy chuyến**: Chỉ được hủy trong 2 phút đầu (khi còn PENDING)
+- **TotalRides**: Chỉ tăng khi chuyến đi COMPLETED
 
 ## Cấu trúc thư mục
 
@@ -35,131 +45,293 @@ dotnet run
 MinRide/
 ├── Program.cs                 # Entry point
 ├── MinRideSystem.cs           # Main system controller
-├── MinRide.csproj             # Project configuration
 ├── Models/
-│   ├── Driver.cs              # Driver model
-│   ├── Customer.cs            # Customer model
-│   └── Ride.cs                # Ride model
+│   ├── Driver.cs              # Driver model với rating, location
+│   ├── Customer.cs            # Customer model với district
+│   └── Ride.cs                # Ride model với status flow
 ├── Managers/
-│   ├── DriverManager.cs       # Driver CRUD operations
-│   ├── CustomerManager.cs     # Customer CRUD operations
-│   └── RideManager.cs         # Ride management
+│   ├── DriverManager.cs       # CRUD + Search + Sort cho tài xế
+│   ├── CustomerManager.cs     # CRUD + District grouping
+│   └── RideManager.cs         # Pending/InProgress/Completed management
 ├── Algorithms/
-│   ├── SpatialSearch.cs       # Spatial search algorithms
-│   └── SortAlgorithms.cs      # Sorting algorithms (MergeSort)
+│   ├── SpatialSearch.cs       # Tìm kiếm theo khoảng cách
+│   └── SortAlgorithms.cs      # MergeSort implementation
 ├── Utils/
-│   ├── FileHandler.cs         # CSV file I/O
-│   ├── UndoStack.cs           # Undo functionality
-│   ├── MenuHelper.cs          # Menu display utilities
-│   ├── InputHelper.cs         # Input validation
-│   └── ValidationHelper.cs    # Data validation
+│   ├── FileHandler.cs         # CSV I/O
+│   ├── UndoStack.cs           # Undo với Stack
+│   └── DataGenerator.cs       # Sinh dữ liệu mẫu
 └── Data/
-    ├── drivers.csv            # Driver data
-    ├── customers.csv          # Customer data
-    └── rides.csv              # Ride history
+    ├── drivers.csv
+    ├── customers.csv
+    └── rides.csv
 ```
 
-## Dữ liệu đầu vào mẫu
+---
 
-### Tài xế (drivers.csv)
-```csv
-ID,Name,Rating,X,Y,TotalRides
-1,An,4.8,2,5,10
-2,Bình,4.9,4,1,15
-3,Cường,4.5,1,3,8
-4,Dũng,4.7,5,4,12
+## Cấu trúc dữ liệu (Data Structures)
+
+| CTDL | Ứng dụng | Độ phức tạp | Lý do chọn |
+|------|----------|-------------|------------|
+| **List\<T\>** | Lưu danh sách tài xế, khách hàng | O(1) truy cập | Random access nhanh |
+| **Dictionary\<int, int\>** | Map ID → Index | O(1) lookup | Tìm kiếm theo ID cực nhanh |
+| **Dictionary\<string, List\<int\>\>** | Nhóm khách theo quận | O(1) lookup | Truy vấn theo nhóm |
+| **Queue\<Ride\>** | Hàng đợi chuyến đi PENDING | O(1) enqueue/dequeue | FIFO - xử lý theo thứ tự đặt |
+| **List\<Ride\>** | Chuyến đi IN_PROGRESS | O(n) search | Cần duyệt để check completion |
+| **LinkedList\<Ride\>** | Lịch sử COMPLETED | O(1) AddLast | Thêm cuối nhanh, không cần resize |
+| **Stack\<Action\>** | Undo operations | O(1) push/pop | LIFO - hoàn tác theo thứ tự ngược |
+
+### Sơ đồ CTDL cho Ride Management:
+
+```
+                    ┌─────────────────────┐
+                    │    CreateRide()     │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    Queue<Ride> pendingRides                  │
+│  [Ride1] → [Ride2] → [Ride3] → ...                          │
+│  FIFO: Đặt trước xử lý trước                                │
+└──────────────────────────────────────────────────────────────┘
+                               │
+                               │ Start() - sau 2 phút
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│                   List<Ride> inProgressRides                 │
+│  [Ride1, Ride2, ...]                                        │
+│  Mỗi ride có ExpectedCompletionTime                         │
+└──────────────────────────────────────────────────────────────┘
+                               │
+                               │ Complete() - sau distance×15s
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│                LinkedList<Ride> rideHistory                  │
+│  [Ride1] ↔ [Ride2] ↔ [Ride3] ↔ ...                          │
+│  Doubly linked: thêm cuối O(1)                              │
+└──────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│           Dictionary<int, List<Ride>> driverRides            │
+│  {                                                          │
+│    1: [Ride1, Ride5, ...],  // Tài xế ID=1                  │
+│    2: [Ride2, Ride3, ...],  // Tài xế ID=2                  │
+│  }                                                          │
+│  O(1) lookup theo DriverId                                  │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### Khách hàng (customers.csv)
-```csv
-ID,Name,District,X,Y
-1,Hoa,Q1,3,3
-2,Minh,Q3,6,2
+---
+
+## Thuật toán (Algorithms)
+
+### 1. Dictionary Lookup - O(1)
+
+**Ứng dụng**: Tìm tài xế/khách hàng theo ID
+
+```csharp
+// Thay vì duyệt O(n):
+foreach (var driver in drivers)
+    if (driver.Id == id) return driver;
+
+// Dùng Dictionary O(1):
+if (idToIndex.TryGetValue(id, out int index))
+    return drivers[index];
 ```
 
-### Lịch sử chuyến đi (rides.csv)
-```csv
-RideId,CustomerId,DriverId,Distance,Fare,Timestamp,Status
-1,1,2,5.2,62400,2024-12-10T10:30:00,CONFIRMED
-2,2,3,3.5,42000,2024-12-11T14:15:00,CONFIRMED
+**Ưu điểm**: Cực nhanh cho lookup theo key
+**Nhược điểm**: Tốn thêm bộ nhớ cho Dictionary
+
+---
+
+### 2. Linear Search - O(n)
+
+**Ứng dụng**: Tìm theo tên (partial match)
+
+```csharp
+drivers.Where(d => d.Name.Contains(searchName, 
+    StringComparison.OrdinalIgnoreCase))
 ```
 
-## Các chức năng chính
+**Ưu điểm**: Đơn giản, hỗ trợ partial match
+**Nhược điểm**: Chậm với dataset lớn
 
-### 1. Quản lý Tài xế
-- Hiển thị tất cả / Top K tài xế
-- Thêm, cập nhật, xóa tài xế
-- Tìm kiếm theo tên hoặc ID
-- Sắp xếp theo rating
-- Cập nhật theo tên (xử lý trùng tên → chọn ID)
+---
 
-### 2. Quản lý Khách hàng
-- Hiển thị tất cả / Top K khách hàng
-- Thêm, cập nhật, xóa khách hàng
-- Tìm kiếm theo tên hoặc ID
-- Liệt kê khách hàng theo quận (phân trang)
+### 3. MergeSort - O(n log n)
 
-### 3. Quản lý Chuyến đi
-- Xem lịch sử chuyến đi của tài xế
-- Lọc theo trạng thái (CONFIRMED, CANCELLED)
-- Lọc theo khoảng thời gian
-- Thống kê doanh thu, quãng đường
+**Ứng dụng**: Sắp xếp tài xế theo Rating
 
-### 4. Tìm Tài xế Phù hợp
-- Nhập ID khách hàng và bán kính R
-- Tìm tài xế gần nhất trong phạm vi
-- Sắp xếp theo: Khoảng cách, Rating, Số chuyến đi
+```csharp
+// Stable sort - giữ thứ tự tương đối
+drivers.OrderByDescending(d => d.Rating).ToList();
+```
 
-### 5. Đặt xe
-- Nhập ID khách hàng, ID tài xế, quãng đường
-- Tự động tính Distance (bao gồm khoảng cách tài xế → khách)
-- Fare = Distance × 12,000 VND
-- Hỗ trợ xác nhận, hủy chuyến đi
+**Ưu điểm**: 
+- Stable sort (giữ thứ tự gốc khi rating bằng nhau)
+- Worst case O(n log n)
 
-### 6. Tự động Ghép cặp
-- 3 chiến lược: Gần nhất, Rating cao nhất, Cân bằng
-- Tự động mở rộng bán kính nếu không tìm thấy
+**Nhược điểm**: Tốn O(n) bộ nhớ phụ
 
-### 7. Undo
-- Quay lại bước trước đó
-- Lưu tối đa 50 thao tác
+---
 
-### 8. Lưu dữ liệu
-- Export ra file CSV
+### 4. Euclidean Distance - O(1)
+
+**Ứng dụng**: Tính khoảng cách tài xế → khách hàng
+
+```csharp
+double distance = Math.Sqrt(
+    Math.Pow(driver.X - customer.X, 2) + 
+    Math.Pow(driver.Y - customer.Y, 2)
+);
+```
+
+**Ưu điểm**: Chính xác cho hệ tọa độ 2D
+**Nhược điểm**: Không phản ánh đường đi thực tế (đường phố)
+
+---
+
+### 5. Spatial Search with Radius - O(n)
+
+**Ứng dụng**: Tìm tài xế trong bán kính R km
+
+```csharp
+drivers
+    .Select(d => (Distance: d.DistanceTo(location), Driver: d))
+    .Where(t => t.Distance <= radius)
+    .OrderBy(t => t.Distance)
+    .ThenByDescending(t => t.Driver.Rating);
+```
+
+**Ưu điểm**: Kết hợp nhiều tiêu chí (khoảng cách + rating)
+**Nhược điểm**: O(n) - có thể cải thiện với Spatial Index (R-tree, QuadTree)
+
+---
+
+### 6. Time-based Auto Processing
+
+**Ứng dụng**: Tự động xử lý chuyến đi theo thời gian
+
+```csharp
+// Check if ride can be cancelled (within 2 minutes)
+public bool CanBeCancelled() {
+    TimeSpan elapsed = DateTime.Now - Timestamp;
+    return elapsed.TotalMinutes < 2;
+}
+
+// Check if ride has finished traveling
+public bool HasFinishedTraveling() {
+    return DateTime.Now >= ExpectedCompletionTime;
+}
+```
+
+**Công thức thời gian di chuyển**:
+```
+TravelTime (seconds) = Distance (km) × 15
+ExpectedCompletionTime = StartTime + TravelTime
+```
+
+---
+
+## Ưu điểm của chương trình
+
+### 1. Hiệu suất (Performance)
+- ✅ O(1) lookup theo ID với Dictionary
+- ✅ O(n log n) sorting với stable sort
+- ✅ O(1) thêm chuyến đi với LinkedList
+
+### 2. Tính năng (Features)
+- ✅ Mô phỏng thời gian thực (1km = 15s)
+- ✅ Hủy chuyến trong 2 phút đầu
+- ✅ Tự động xử lý chuyến đi
+- ✅ Undo/Redo operations
+- ✅ Lưu/Load từ CSV
+
+### 3. Code Quality
+- ✅ Separation of Concerns (Models/Managers/Utils)
+- ✅ XML Documentation
+- ✅ Validation ở nhiều tầng
+- ✅ Error handling với try-catch
+
+---
+
+## Nhược điểm và hạn chế
+
+### 1. Hiệu suất (Performance)
+- ❌ Linear Search O(n) cho tìm theo tên - có thể dùng Trie
+- ❌ Spatial Search O(n) - có thể dùng R-tree/QuadTree
+- ❌ Không có caching/indexing cho queries phức tạp
+
+### 2. Tính năng (Features)
+- ❌ Không có real-time notification
+- ❌ Khoảng cách Euclidean không phản ánh đường thực
+- ❌ Không hỗ trợ multi-threading
+- ❌ Chưa có payment system
+
+### 3. Scalability
+- ❌ In-memory storage - không phù hợp dataset lớn
+- ❌ Single instance - không hỗ trợ distributed system
+- ❌ CSV storage - không optimal cho concurrent access
+
+---
+
+## Cải tiến đề xuất
+
+| Vấn đề | Giải pháp | Độ phức tạp mới |
+|--------|-----------|-----------------|
+| Linear search theo tên | Trie hoặc Suffix Tree | O(m) với m = độ dài search |
+| Spatial search O(n) | R-tree hoặc QuadTree | O(log n) |
+| In-memory storage | Database (SQLite/PostgreSQL) | Persistent + Indexing |
+| Single thread | Async/await + Background tasks | Non-blocking |
+| Euclidean distance | Google Maps API / OSM | Real-world routing |
+
+---
 
 ## Công thức tính giá
 
 ```
 Fare = Total Distance × 12,000 VND
-Total Distance = Khoảng cách tài xế đến khách + Khoảng cách điểm đón đến điểm đích
+Total Distance = Khoảng cách tài xế→khách + Khoảng cách đón→đích
+Travel Time = Total Distance × 15 seconds
 ```
 
-## Cấu trúc dữ liệu sử dụng
+---
 
-| Chức năng | CTDL | Lý do |
-|-----------|------|-------|
-| Lưu danh sách | List<T> | Truy cập O(1) theo index |
-| Tra cứu theo ID | Dictionary<int, int> | Lookup O(1) |
-| Tra cứu theo quận | Dictionary<string, List<int>> | Nhóm theo quận O(1) |
-| Hàng đợi đặt xe | Queue<Ride> | FIFO |
-| Lịch sử chuyến đi | LinkedList<Ride> | Thêm cuối O(1) |
-| Undo Stack | Stack<Action> | LIFO |
+## Các chức năng chính
 
-## Thuật toán sử dụng
+### 1. Quản lý Tài xế
+- CRUD operations (thêm/sửa/xóa)
+- Tìm kiếm theo ID (O(1)) hoặc tên (O(n))
+- Sắp xếp theo rating (MergeSort)
+- Top K tài xế theo rating
 
-| Thuật toán | Độ phức tạp | Ứng dụng |
-|------------|-------------|----------|
-| Linear Search | O(n) | Tìm theo tên |
-| Dictionary Lookup | O(1) | Tìm theo ID |
-| MergeSort | O(n log n) | Sắp xếp rating |
-| Euclidean Distance | O(1) | Tính khoảng cách |
+### 2. Quản lý Khách hàng
+- CRUD operations
+- Phân nhóm theo quận/huyện
+- Pagination cho danh sách
+
+### 3. Quản lý Chuyến đi
+- Xem PENDING / IN_PROGRESS / COMPLETED
+- Hủy chuyến (trong 2 phút)
+- Tự động xử lý theo thời gian
+- Lịch sử theo tài xế
+
+### 4. Tìm & Ghép tài xế
+- Tìm trong bán kính R km
+- 3 chiến lược: Gần nhất / Rating cao / Cân bằng
+- Tự động mở rộng bán kính
+
+### 5. Undo
+- Stack-based undo (LIFO)
+- Tối đa 50 operations
+
+---
 
 ## Tác giả
 
 - Dự án NOW CHALLENGE - MinRide
-- Thầy Bảo Dev Di
+- Nhóm 7
 
 ## License
 
 Educational use only.
-

@@ -101,7 +101,7 @@ public class MinRideSystem
                     rideCount++;
 
                     // Sync TotalRides: increment for confirmed rides
-                    if (ride.Status == "CONFIRMED")
+                    if (ride.Status == "COMPLETED")
                     {
                         driver.IncrementRides();
                     }
@@ -1030,20 +1030,27 @@ public class MinRideSystem
 
         while (!back)
         {
-            // Auto-confirm expired rides
-            rideManager.AutoConfirmExpiredRides(driverManager);
+            // Process rides: auto-start expired pending, complete finished rides
+            rideManager.ProcessRides(driverManager);
 
+            // Show current status summary
+            var (pending, inProgress, completed) = rideManager.GetRideCounts();
+            
             Console.WriteLine();
-            Console.WriteLine("┌────────────────────────────────────────────────┐");
-            Console.WriteLine("│              QUẢN LÝ CHUYẾN ĐI                 │");
-            Console.WriteLine("├────────────────────────────────────────────────┤");
-            Console.WriteLine("│  1. Xem lịch sử chuyến đi của tài xế           │");
-            Console.WriteLine("│  2. Xem các chuyến đi đang chờ                 │");
-            Console.WriteLine("│  3. Xác nhận tất cả chuyến đi                  │");
-            Console.WriteLine("│  4. Hủy chuyến đi (trong vòng 2 phút)          │");
-            Console.WriteLine("│  5. Quay lại                                   │");
-            Console.WriteLine("└────────────────────────────────────────────────┘");
-            Console.Write("Chọn chức năng: ");
+            Console.WriteLine("┌──────────────────────────────────────────────────────────────┐");
+            Console.WriteLine("│                    QUẢN LÝ CHUYẾN ĐI                         │");
+            Console.WriteLine("├──────────────────────────────────────────────────────────────┤");
+            Console.WriteLine($"│  Trạng thái: {pending} chờ | {inProgress} đang chạy | {completed} hoàn thành{"",-12} │");
+            Console.WriteLine("├──────────────────────────────────────────────────────────────┤");
+            Console.WriteLine("│  1. Xem lịch sử chuyến đi của tài xế                         │");
+            Console.WriteLine("│  2. Xem các chuyến đi đang chờ (PENDING)                     │");
+            Console.WriteLine("│  3. Xem các chuyến đi đang di chuyển (IN_PROGRESS)           │");
+            Console.WriteLine("│  4. Bắt đầu tất cả chuyến đi đang chờ                        │");
+            Console.WriteLine("│  5. Hủy chuyến đi (trong vòng 2 phút)                        │");
+            Console.WriteLine("│  6. Quay lại                                                 │");
+            Console.WriteLine("└──────────────────────────────────────────────────────────────┘");
+            Console.WriteLine("  ℹ 1km = 15 giây di chuyển | Có thể hủy trong 2 phút đầu");
+            Console.Write("\nChọn chức năng: ");
 
             string? choice = Console.ReadLine();
 
@@ -1056,12 +1063,15 @@ public class MinRideSystem
                     rideManager.DisplayPendingRides();
                     break;
                 case "3":
-                    rideManager.ConfirmAllRides(driverManager);
+                    rideManager.DisplayInProgressRides();
                     break;
                 case "4":
-                    CancelPendingRide();
+                    rideManager.StartAllPendingRides();
                     break;
                 case "5":
+                    CancelPendingRide();
+                    break;
+                case "6":
                     back = true;
                     break;
                 default:
@@ -1893,9 +1903,9 @@ public class MinRideSystem
         Console.WriteLine($"║  Tổng số chuyến:  {driver.TotalRides,-42} ║");
         Console.WriteLine("╚══════════════════════════════════════════════════════════════╝");
 
-        // Get all confirmed rides sorted by timestamp (ascending - oldest first)
+        // Get all completed rides sorted by timestamp (ascending - oldest first)
         var rides = rideManager.GetRidesByDriver(driverId)
-            .Where(r => r.Status == "CONFIRMED")
+            .Where(r => r.Status == "COMPLETED")
             .OrderBy(r => r.Timestamp)
             .ToList();
 

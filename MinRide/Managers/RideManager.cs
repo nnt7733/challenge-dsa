@@ -3,24 +3,30 @@ using MinRide.Models;
 namespace MinRide.Managers;
 
 /// <summary>
-/// Manages rides including pending rides queue and ride history.
+/// Manages rides including pending rides queue, in-progress rides, and ride history.
+/// Ride flow: PENDING → IN_PROGRESS → COMPLETED
 /// </summary>
 public class RideManager
 {
     /// <summary>
-    /// The history of all confirmed rides stored as a linked list.
+    /// The history of all completed rides stored as a linked list.
     /// </summary>
     private LinkedList<Ride> rideHistory;
 
     /// <summary>
-    /// Maps driver ID to their list of rides.
+    /// Maps driver ID to their list of completed rides.
     /// </summary>
     private Dictionary<int, List<Ride>> driverRides;
 
     /// <summary>
-    /// Queue of pending rides waiting to be confirmed.
+    /// Queue of pending rides waiting to start (can be cancelled within 2 min).
     /// </summary>
     private Queue<Ride> pendingRides;
+
+    /// <summary>
+    /// List of in-progress rides (driver is traveling).
+    /// </summary>
+    private List<Ride> inProgressRides;
 
     /// <summary>
     /// The next ride ID to be assigned.
@@ -35,6 +41,7 @@ public class RideManager
         rideHistory = new LinkedList<Ride>();
         driverRides = new Dictionary<int, List<Ride>>();
         pendingRides = new Queue<Ride>();
+        inProgressRides = new List<Ride>();
         nextRideId = 1;
     }
 
@@ -54,18 +61,46 @@ public class RideManager
     }
 
     /// <summary>
-    /// Confirms all pending rides and moves them to ride history.
+    /// Starts all pending rides - moves them to IN_PROGRESS.
     /// </summary>
-    /// <param name="driverManager">Optional driver manager to update TotalRides.</param>
-    public void ConfirmAllRides(DriverManager? driverManager = null)
+    public void StartAllPendingRides()
     {
-        int confirmedCount = 0;
+        int startedCount = 0;
 
         while (pendingRides.Count > 0)
         {
             Ride ride = pendingRides.Dequeue();
-            ride.Confirm();
+            ride.Start();
+            inProgressRides.Add(ride);
+            startedCount++;
 
+            Console.WriteLine($"  → Chuyến {ride.RideId}: Bắt đầu di chuyển, thời gian: {ride.GetTotalTravelTime()}s ({ride.Distance:F1}km)");
+        }
+
+        if (startedCount > 0)
+        {
+            Console.WriteLine($"\n✓ Đã bắt đầu {startedCount} chuyến đi.");
+        }
+        else
+        {
+            Console.WriteLine("Không có chuyến đi nào để bắt đầu.");
+        }
+    }
+
+    /// <summary>
+    /// Completes rides that have finished traveling and updates driver stats.
+    /// </summary>
+    /// <param name="driverManager">Driver manager to update TotalRides.</param>
+    /// <returns>Number of rides completed.</returns>
+    public int CompleteFinishedRides(DriverManager? driverManager = null)
+    {
+        var completedRides = inProgressRides.Where(r => r.HasFinishedTraveling()).ToList();
+        
+        foreach (var ride in completedRides)
+        {
+            ride.Complete();
+            inProgressRides.Remove(ride);
+            
             // Add to ride history
             rideHistory.AddLast(ride);
 
@@ -83,17 +118,45 @@ public class RideManager
                 driver?.IncrementRides();
             }
 
-            confirmedCount++;
+            Console.WriteLine($"✓ Chuyến {ride.RideId} đã hoàn thành! (Tài xế D{ride.DriverId}, Giá: {ride.Fare:N0}đ)");
         }
 
-        if (confirmedCount > 0)
+        return completedRides.Count;
+    }
+
+    /// <summary>
+    /// Gets list of in-progress rides.
+    /// </summary>
+    public List<Ride> GetInProgressRides()
+    {
+        return inProgressRides;
+    }
+
+    /// <summary>
+    /// Displays in-progress rides with remaining time.
+    /// </summary>
+    public void DisplayInProgressRides()
+    {
+        if (inProgressRides.Count == 0)
         {
-            Console.WriteLine($"✓ Đã xác nhận {confirmedCount} chuyến đi.");
+            Console.WriteLine("Không có chuyến đi nào đang di chuyển.");
+            return;
         }
-        else
+
+        Console.WriteLine($"\n--- CHUYẾN ĐI ĐANG DI CHUYỂN ({inProgressRides.Count} chuyến) ---");
+        Console.WriteLine("┌─────┬─────────┬────────────┬────────────┬─────────────┬───────────────┬──────────────────┐");
+        Console.WriteLine("│ STT │ RideID  │ Khách hàng │  Tài xế    │ Quãng đường │    Giá cước   │ Còn lại          │");
+        Console.WriteLine("├─────┼─────────┼────────────┼────────────┼─────────────┼───────────────┼──────────────────┤");
+
+        int stt = 1;
+        foreach (var ride in inProgressRides)
         {
-            Console.WriteLine("Không có chuyến đi nào để xác nhận.");
+            int remaining = ride.GetRemainingTravelTime();
+            string remainingStr = remaining > 0 ? $"{remaining}s" : "Sắp xong";
+            Console.WriteLine($"│ {stt,3} │ {ride.RideId,7} │ C{ride.CustomerId,-9} │ D{ride.DriverId,-9} │ {ride.Distance,9:F1}km │ {ride.Fare,11:N0}đ │ {remainingStr,-16} │");
+            stt++;
         }
+        Console.WriteLine("└─────┴─────────┴────────────┴────────────┴─────────────┴───────────────┴──────────────────┘");
     }
 
     /// <summary>
@@ -153,60 +216,57 @@ public class RideManager
     }
 
     /// <summary>
-    /// Auto-confirms rides that have been pending for more than 2 minutes.
+    /// Auto-starts rides that have been pending for more than 2 minutes.
+    /// Also completes any finished in-progress rides.
     /// </summary>
     /// <param name="driverManager">Optional driver manager to update TotalRides.</param>
-    /// <returns>Number of rides auto-confirmed.</returns>
+    /// <returns>Number of rides auto-started.</returns>
+    public int ProcessRides(DriverManager? driverManager = null)
+    {
+        int autoStartedCount = 0;
+
+        // Step 1: Complete any finished rides first
+        CompleteFinishedRides(driverManager);
+
+        // Step 2: Auto-start expired pending rides
+        if (pendingRides.Count > 0)
+        {
+            var stillPending = new Queue<Ride>();
+
+            while (pendingRides.Count > 0)
+            {
+                var ride = pendingRides.Dequeue();
+                
+                if (!ride.CanBeCancelled())
+                {
+                    // Expired - auto start the ride
+                    ride.Start();
+                    inProgressRides.Add(ride);
+                    autoStartedCount++;
+                    Console.WriteLine($"→ Chuyến {ride.RideId} tự động bắt đầu (hết thời gian hủy). Thời gian di chuyển: {ride.GetTotalTravelTime()}s");
+                }
+                else
+                {
+                    stillPending.Enqueue(ride);
+                }
+            }
+
+            // Restore still pending rides
+            while (stillPending.Count > 0)
+            {
+                pendingRides.Enqueue(stillPending.Dequeue());
+            }
+        }
+
+        return autoStartedCount;
+    }
+
+    /// <summary>
+    /// Legacy method - now calls ProcessRides.
+    /// </summary>
     public int AutoConfirmExpiredRides(DriverManager? driverManager = null)
     {
-        if (pendingRides.Count == 0) return 0;
-
-        var stillPending = new Queue<Ride>();
-        int autoConfirmedCount = 0;
-
-        while (pendingRides.Count > 0)
-        {
-            var ride = pendingRides.Dequeue();
-            
-            if (!ride.CanBeCancelled())
-            {
-                // Expired - auto confirm
-                ride.Confirm();
-                rideHistory.AddLast(ride);
-                
-                if (!driverRides.ContainsKey(ride.DriverId))
-                {
-                    driverRides[ride.DriverId] = new List<Ride>();
-                }
-                driverRides[ride.DriverId].Add(ride);
-
-                // Update driver's TotalRides
-                if (driverManager != null)
-                {
-                    var driver = driverManager.FindDriverById(ride.DriverId);
-                    driver?.IncrementRides();
-                }
-
-                autoConfirmedCount++;
-            }
-            else
-            {
-                stillPending.Enqueue(ride);
-            }
-        }
-
-        // Restore still pending rides
-        while (stillPending.Count > 0)
-        {
-            pendingRides.Enqueue(stillPending.Dequeue());
-        }
-
-        if (autoConfirmedCount > 0)
-        {
-            Console.WriteLine($"✓ Tự động xác nhận {autoConfirmedCount} chuyến đi đã hết thời gian hủy.");
-        }
-
-        return autoConfirmedCount;
+        return ProcessRides(driverManager);
     }
 
     /// <summary>
@@ -324,11 +384,11 @@ public class RideManager
     }
 
     /// <summary>
-    /// Checks if a driver has confirmed rides within the specified hours.
+    /// Checks if a driver has completed rides within the specified hours.
     /// </summary>
     /// <param name="driverId">The driver ID to check.</param>
     /// <param name="hours">Number of hours to look back. Default is 24.</param>
-    /// <returns><c>true</c> if driver has recent confirmed rides; otherwise, <c>false</c>.</returns>
+    /// <returns><c>true</c> if driver has recent completed rides; otherwise, <c>false</c>.</returns>
     public bool HasRecentRidesForDriver(int driverId, int hours = 24)
     {
         if (!driverRides.TryGetValue(driverId, out var rides))
@@ -337,7 +397,17 @@ public class RideManager
         }
 
         DateTime cutoff = DateTime.Now.AddHours(-hours);
-        return rides.Any(r => r.Status == "CONFIRMED" && r.Timestamp >= cutoff);
+        return rides.Any(r => r.Status == "COMPLETED" && r.Timestamp >= cutoff);
+    }
+
+    /// <summary>
+    /// Checks if a driver has any in-progress rides.
+    /// </summary>
+    /// <param name="driverId">The driver ID to check.</param>
+    /// <returns><c>true</c> if driver has in-progress rides; otherwise, <c>false</c>.</returns>
+    public bool HasInProgressRidesForDriver(int driverId)
+    {
+        return inProgressRides.Any(r => r.DriverId == driverId);
     }
 
     /// <summary>
@@ -379,10 +449,10 @@ public class RideManager
     }
 
     /// <summary>
-    /// Gets the total revenue for a driver (only confirmed rides).
+    /// Gets the total revenue for a driver (only completed rides).
     /// </summary>
     /// <param name="driverId">The driver ID.</param>
-    /// <returns>Total fare from confirmed rides.</returns>
+    /// <returns>Total fare from completed rides.</returns>
     public double GetDriverRevenue(int driverId)
     {
         if (!driverRides.TryGetValue(driverId, out var rides))
@@ -390,28 +460,36 @@ public class RideManager
             return 0;
         }
 
-        return rides.Where(r => r.Status == "CONFIRMED").Sum(r => r.Fare);
+        return rides.Where(r => r.Status == "COMPLETED").Sum(r => r.Fare);
     }
 
     /// <summary>
     /// Gets statistics for a driver's rides.
     /// </summary>
     /// <param name="driverId">The driver ID.</param>
-    /// <returns>Tuple of (total rides, confirmed count, total revenue, average distance).</returns>
-    public (int TotalRides, int ConfirmedCount, double TotalRevenue, double AverageDistance) GetDriverStats(int driverId)
+    /// <returns>Tuple of (total rides, completed count, total revenue, average distance).</returns>
+    public (int TotalRides, int CompletedCount, double TotalRevenue, double AverageDistance) GetDriverStats(int driverId)
     {
         if (!driverRides.TryGetValue(driverId, out var rides) || rides.Count == 0)
         {
             return (0, 0, 0, 0);
         }
 
-        var confirmedRides = rides.Where(r => r.Status == "CONFIRMED").ToList();
+        var completedRides = rides.Where(r => r.Status == "COMPLETED").ToList();
         int totalRides = rides.Count;
-        int confirmedCount = confirmedRides.Count;
-        double totalRevenue = confirmedRides.Sum(r => r.Fare);
-        double avgDistance = confirmedRides.Count > 0 ? confirmedRides.Average(r => r.Distance) : 0;
+        int completedCount = completedRides.Count;
+        double totalRevenue = completedRides.Sum(r => r.Fare);
+        double avgDistance = completedRides.Count > 0 ? completedRides.Average(r => r.Distance) : 0;
 
-        return (totalRides, confirmedCount, totalRevenue, avgDistance);
+        return (totalRides, completedCount, totalRevenue, avgDistance);
+    }
+
+    /// <summary>
+    /// Gets a summary of all ride statuses.
+    /// </summary>
+    public (int Pending, int InProgress, int Completed) GetRideCounts()
+    {
+        return (pendingRides.Count, inProgressRides.Count, rideHistory.Count);
     }
 }
 
