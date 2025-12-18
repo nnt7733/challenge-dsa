@@ -46,7 +46,7 @@ public class Customer
     /// </summary>
     public void Display()
     {
-        Console.WriteLine($"ID: {Id} | Name: {Name} | District: {District} | Location: ({Location.X}, {Location.Y})");
+        Console.WriteLine($"ID: {Id} | Tên: {Name} | Quận/Huyện: {District} | Vị trí: ({Location.X}, {Location.Y})");
     }
 
     /// <summary>
@@ -54,14 +54,14 @@ public class Customer
     /// </summary>
     public void DisplayDetailed()
     {
-        Console.WriteLine("╔══════════════════════════════════════════╗");
-        Console.WriteLine("║         THÔNG TIN KHÁCH HÀNG             ║");
-        Console.WriteLine("╠══════════════════════════════════════════╣");
-        Console.WriteLine($"║ ID:              {Id,-24} ║");
-        Console.WriteLine($"║ Tên:             {Name,-24} ║");
-        Console.WriteLine($"║ Quận/Huyện:      {District,-24} ║");
-        Console.WriteLine($"║ Vị trí:          ({Location.X:F1}, {Location.Y:F1}){"",-14} ║");
-        Console.WriteLine("╚══════════════════════════════════════════╝");
+        Console.WriteLine("+--------------------------------------------+");
+        Console.WriteLine("|         THONG TIN KHACH HANG              |");
+        Console.WriteLine("+--------------------------------------------+");
+        Console.WriteLine($"| ID:              {Id,-25} |");
+        Console.WriteLine($"| Ten:             {Name,-25} |");
+        Console.WriteLine($"| Quan/Huyen:      {District,-25} |");
+        Console.WriteLine($"| Vi tri:          ({Location.X:F1}, {Location.Y:F1}){"",-15} |");
+        Console.WriteLine("+--------------------------------------------+");
     }
 
     /// <summary>

@@ -66,7 +66,7 @@ public class CustomerManager
 
         if (!silent)
         {
-            Console.WriteLine($"✓ Đã thêm khách hàng {customer.Name} (ID: {customer.Id})");
+            Console.WriteLine($"[OK] Da them khach hang {customer.Name} (ID: {customer.Id})");
         }
     }
 
@@ -219,6 +219,17 @@ public class CustomerManager
     public List<string> GetAllDistricts()
     {
         return districtIndex.Keys.ToList();
+    }
+
+    /// <summary>
+    /// Gets the next available ID for a new customer.
+    /// </summary>
+    /// <returns>The next available customer ID.</returns>
+    public int GetNextId()
+    {
+        if (customers.Count == 0)
+            return 1;
+        return customers.Max(c => c.Id) + 1;
     }
 
     /// <summary>
@@ -479,7 +490,7 @@ public class CustomerManager
 
         if (UpdateCustomer(id, newName, newDistrict, newX, newY))
         {
-            Console.WriteLine("\n✓ Cập nhật thành công!");
+            Console.WriteLine("\n[OK] Cap nhat thanh cong!");
             Console.WriteLine("--- THÔNG TIN SAU CẬP NHẬT ---");
             customer.DisplayDetailed();
         }
@@ -513,19 +524,19 @@ public class CustomerManager
         {
             var customers = GetCustomersByDistrict(district, currentPage * pageSize, pageSize);
 
-            Console.WriteLine($"\n--- KHÁCH HÀNG QUẬN {district.ToUpper()} ---");
-            Console.WriteLine("┌─────┬────────┬────────────────────────┬─────────────────┐");
-            Console.WriteLine("│ STT │   ID   │          Tên           │     Vị trí      │");
-            Console.WriteLine("├─────┼────────┼────────────────────────┼─────────────────┤");
+            Console.WriteLine($"\n--- KHACH HANG QUAN {district.ToUpper()} ---");
+            Console.WriteLine("+-----+--------+------------------------+-----------------+");
+            Console.WriteLine("| STT |   ID   |          Ten           |     Vi tri      |");
+            Console.WriteLine("+-----+--------+------------------------+-----------------+");
 
             int stt = currentPage * pageSize + 1;
             foreach (var c in customers)
             {
                 string name = c.Name.Length > 22 ? c.Name.Substring(0, 19) + "..." : c.Name;
-                Console.WriteLine($"│ {stt,3} │ {c.Id,6} │ {name,-22} │ ({c.Location.X:F1}, {c.Location.Y:F1}){"",-5} │");
+                Console.WriteLine($"| {stt,3} | {c.Id,6} | {name,-22} | ({c.Location.X:F1}, {c.Location.Y:F1}){"",-5} |");
                 stt++;
             }
-            Console.WriteLine("└─────┴────────┴────────────────────────┴─────────────────┘");
+            Console.WriteLine("+-----+--------+------------------------+-----------------+");
 
             Console.WriteLine($"\nTrang {currentPage + 1} / {totalPages} | Tổng: {totalCount} khách hàng");
 

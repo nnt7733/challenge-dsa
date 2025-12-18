@@ -156,7 +156,7 @@ public static class DataGenerator
         FileHandler.SaveCustomers(Path.Combine(dataFolder, "customers.csv"), customers);
         FileHandler.SaveRides(Path.Combine(dataFolder, "rides.csv"), rides);
 
-        Console.WriteLine("\n✓ Data generation complete!");
+        Console.WriteLine("\n[OK] Data generation complete!");
         Console.WriteLine($"  - Drivers: {driverCount}");
         Console.WriteLine($"  - Customers: {customerCount}");
         Console.WriteLine($"  - Rides: {rideCount}");
@@ -167,23 +167,24 @@ public static class DataGenerator
     /// </summary>
     public static void GenerateDataInteractive()
     {
-        Console.WriteLine("\n╔══════════════════════════════════════════╗");
-        Console.WriteLine("║        SINH DỮ LIỆU MẪU                  ║");
-        Console.WriteLine("╚══════════════════════════════════════════╝");
+        Console.WriteLine();
+        Console.WriteLine("+--------------------------------------------+");
+        Console.WriteLine("|          SINH DU LIEU MAU                  |");
+        Console.WriteLine("+--------------------------------------------+");
 
-        Console.Write("Nhập số lượng tài xế (mặc định 10): ");
+        Console.Write("Nhap so luong tai xe (mac dinh 10): ");
         if (!int.TryParse(Console.ReadLine(), out int driverCount) || driverCount <= 0)
         {
             driverCount = 10;
         }
 
-        Console.Write("Nhập số lượng khách hàng (mặc định 10): ");
+        Console.Write("Nhap so luong khach hang (mac dinh 10): ");
         if (!int.TryParse(Console.ReadLine(), out int customerCount) || customerCount <= 0)
         {
             customerCount = 10;
         }
 
-        Console.Write("Nhập số lượng chuyến đi (mặc định 5): ");
+        Console.Write("Nhap so luong chuyen di (mac dinh 5): ");
         if (!int.TryParse(Console.ReadLine(), out int rideCount) || rideCount <= 0)
         {
             rideCount = 5;
@@ -193,4 +194,3 @@ public static class DataGenerator
         GenerateAndSaveData(driverCount, customerCount, rideCount);
     }
 }
-

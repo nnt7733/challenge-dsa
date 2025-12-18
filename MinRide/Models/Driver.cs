@@ -31,6 +31,16 @@ public class Driver
     public int TotalRides { get; private set; }
 
     /// <summary>
+    /// Gets the total number of ratings received by the driver.
+    /// </summary>
+    public int RatingCount { get; private set; }
+
+    /// <summary>
+    /// Gets the sum of all ratings (used for calculating average).
+    /// </summary>
+    public double RatingSum { get; private set; }
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="Driver"/> class.
     /// </summary>
     /// <param name="id">The unique identifier for the driver.</param>
@@ -51,6 +61,8 @@ public class Driver
         Rating = rating;
         Location = (x, y);
         TotalRides = 0;
+        RatingCount = 0;
+        RatingSum = 0;
     }
 
     /// <summary>
@@ -66,6 +78,32 @@ public class Driver
         }
 
         Rating = rating;
+    }
+
+    /// <summary>
+    /// Adds a new rating from a customer and recalculates the average.
+    /// </summary>
+    /// <param name="stars">The rating value (1-5 stars).</param>
+    public void AddRating(int stars)
+    {
+        if (stars < 1 || stars > 5) return;
+
+        RatingSum += stars;
+        RatingCount++;
+        Rating = Math.Round(RatingSum / RatingCount, 1);
+    }
+
+    /// <summary>
+    /// Sets the rating data directly (used when loading from CSV).
+    /// </summary>
+    public void SetRatingData(double ratingSum, int ratingCount)
+    {
+        RatingSum = ratingSum;
+        RatingCount = ratingCount;
+        if (ratingCount > 0)
+        {
+            Rating = Math.Round(ratingSum / ratingCount, 1);
+        }
     }
 
     /// <summary>
@@ -111,7 +149,7 @@ public class Driver
     /// </summary>
     public void Display()
     {
-        Console.WriteLine($"ID: {Id} | Name: {Name} | Rating: {Rating:F1} | Location: ({Location.X}, {Location.Y}) | Total Rides: {TotalRides}");
+        Console.WriteLine($"ID: {Id} | Tên: {Name} | Đánh giá: {Rating:F1} sao | Vị trí: ({Location.X}, {Location.Y}) | Số chuyến: {TotalRides}");
     }
 
     /// <summary>
@@ -119,20 +157,15 @@ public class Driver
     /// </summary>
     public void DisplayDetailed()
     {
-        // Generate star rating visualization
-        int fullStars = (int)Rating;
-        bool hasHalfStar = (Rating - fullStars) >= 0.5;
-        string stars = new string('★', fullStars) + (hasHalfStar ? "☆" : "") + new string('☆', 5 - fullStars - (hasHalfStar ? 1 : 0));
-
-        Console.WriteLine("╔══════════════════════════════════════════╗");
-        Console.WriteLine("║          THÔNG TIN TÀI XẾ                ║");
-        Console.WriteLine("╠══════════════════════════════════════════╣");
-        Console.WriteLine($"║ ID:              {Id,-24} ║");
-        Console.WriteLine($"║ Tên:             {Name,-24} ║");
-        Console.WriteLine($"║ Rating:          {Rating:F1} {stars,-17} ║");
-        Console.WriteLine($"║ Vị trí:          ({Location.X:F1}, {Location.Y:F1}){"",-14} ║");
-        Console.WriteLine($"║ Tổng số chuyến:  {TotalRides,-24} ║");
-        Console.WriteLine("╚══════════════════════════════════════════╝");
+        Console.WriteLine("+--------------------------------------------+");
+        Console.WriteLine("|          THONG TIN TAI XE                  |");
+        Console.WriteLine("+--------------------------------------------+");
+        Console.WriteLine($"| ID:               {Id,-24} |");
+        Console.WriteLine($"| Ten:              {Name,-24} |");
+        Console.WriteLine($"| Rating:           {Rating:F1} sao ({RatingCount} danh gia){"",-6} |");
+        Console.WriteLine($"| Vi tri:           ({Location.X:F1}, {Location.Y:F1}){"",-14} |");
+        Console.WriteLine($"| Tong so chuyen:   {TotalRides,-24} |");
+        Console.WriteLine("+--------------------------------------------+");
     }
 
     /// <summary>
@@ -141,7 +174,7 @@ public class Driver
     /// <returns>A comma-separated string containing the driver's data.</returns>
     public string ToCSV()
     {
-        return $"{Id},{Name},{Rating},{Location.X},{Location.Y},{TotalRides}";
+        return $"{Id},{Name},{Rating},{Location.X},{Location.Y},{TotalRides},{RatingSum},{RatingCount}";
     }
 
     /// <summary>
@@ -163,9 +196,14 @@ public class Driver
             int totalRides = int.Parse(parts[5]);
 
             Driver driver = new Driver(id, name, rating, x, y);
-            for (int i = 0; i < totalRides; i++)
+            driver.SetTotalRides(totalRides);
+
+            // Load rating data if available (backward compatibility)
+            if (parts.Length >= 8)
             {
-                driver.IncrementRides();
+                double ratingSum = double.Parse(parts[6]);
+                int ratingCount = int.Parse(parts[7]);
+                driver.SetRatingData(ratingSum, ratingCount);
             }
 
             return driver;
@@ -176,4 +214,3 @@ public class Driver
         }
     }
 }
-

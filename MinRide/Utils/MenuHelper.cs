@@ -20,18 +20,18 @@ public static class MenuHelper
         string leftPad = new string(' ', padding);
         string rightPad = new string(' ', width - 2 - padding - paddedTitle.Length);
 
-        Console.WriteLine($"╔{new string('═', width - 2)}╗");
-        Console.WriteLine($"║{leftPad}{paddedTitle}{rightPad}║");
-        Console.WriteLine($"╚{new string('═', width - 2)}╝");
+        Console.WriteLine($"+{new string('-', width - 2)}+");
+        Console.WriteLine($"|{leftPad}{paddedTitle}{rightPad}|");
+        Console.WriteLine($"+{new string('-', width - 2)}+");
     }
 
     /// <summary>
     /// Displays a menu and gets the user's choice.
     /// </summary>
     /// <param name="options">Array of menu options to display.</param>
-    /// <param name="prompt">The prompt to display. Default is "Chọn chức năng".</param>
+    /// <param name="prompt">The prompt to display. Default is "Chon chuc nang".</param>
     /// <returns>The selected option (1-based index).</returns>
-    public static int GetMenuChoice(string[] options, string prompt = "Chọn chức năng")
+    public static int GetMenuChoice(string[] options, string prompt = "Chon chuc nang")
     {
         while (true)
         {
@@ -87,33 +87,27 @@ public static class MenuHelper
         }
 
         // Build format strings
-        string separator = "┼";
-        string topBorder = "┌";
-        string bottomBorder = "└";
-        string headerSeparator = "├";
+        string topBorder = "+";
+        string bottomBorder = "+";
+        string headerSeparator = "+";
 
         foreach (var col in columns.Keys)
         {
             int width = columnWidths[col];
-            topBorder += new string('─', width) + "┬";
-            bottomBorder += new string('─', width) + "┴";
-            headerSeparator += new string('─', width) + "┼";
-            separator += new string('─', width) + "┼";
+            topBorder += new string('-', width) + "+";
+            bottomBorder += new string('-', width) + "+";
+            headerSeparator += new string('-', width) + "+";
         }
-
-        topBorder = topBorder.TrimEnd('┬') + "┐";
-        bottomBorder = bottomBorder.TrimEnd('┴') + "┘";
-        headerSeparator = headerSeparator.TrimEnd('┼') + "┤";
 
         // Print table
         Console.WriteLine(topBorder);
 
         // Print header
-        string headerRow = "│";
+        string headerRow = "|";
         foreach (var col in columns.Keys)
         {
             int width = columnWidths[col];
-            headerRow += $" {col.PadRight(width - 1)}│";
+            headerRow += $" {col.PadRight(width - 1)}|";
         }
         Console.WriteLine(headerRow);
         Console.WriteLine(headerSeparator);
@@ -121,7 +115,7 @@ public static class MenuHelper
         // Print data rows
         foreach (var item in items)
         {
-            string dataRow = "│";
+            string dataRow = "|";
             foreach (var col in columns)
             {
                 int width = columnWidths[col.Key];
@@ -130,7 +124,7 @@ public static class MenuHelper
                 {
                     value = value.Substring(0, width - 4) + "...";
                 }
-                dataRow += $" {value.PadRight(width - 1)}│";
+                dataRow += $" {value.PadRight(width - 1)}|";
             }
             Console.WriteLine(dataRow);
         }
@@ -159,7 +153,7 @@ public static class MenuHelper
                 return false;
             }
 
-            ShowError("Vui lòng nhập Y hoặc N.");
+            ShowError("Vui long nhap Y hoac N.");
         }
     }
 
@@ -169,7 +163,7 @@ public static class MenuHelper
     public static void PressAnyKey()
     {
         Console.WriteLine();
-        Console.WriteLine("Nhấn phím bất kỳ để tiếp tục...");
+        Console.WriteLine("Nhan phim bat ky de tiep tuc...");
         Console.ReadKey(true);
         Console.Clear();
     }
@@ -182,7 +176,7 @@ public static class MenuHelper
     {
         ConsoleColor originalColor = Console.ForegroundColor;
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"✓ {message}");
+        Console.WriteLine($"[OK] {message}");
         Console.ForegroundColor = originalColor;
     }
 
@@ -194,7 +188,7 @@ public static class MenuHelper
     {
         ConsoleColor originalColor = Console.ForegroundColor;
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"✗ {message}");
+        Console.WriteLine($"[X] {message}");
         Console.ForegroundColor = originalColor;
     }
 
@@ -206,7 +200,7 @@ public static class MenuHelper
     {
         ConsoleColor originalColor = Console.ForegroundColor;
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"⚠ {message}");
+        Console.WriteLine($"[!] {message}");
         Console.ForegroundColor = originalColor;
     }
 
@@ -218,8 +212,7 @@ public static class MenuHelper
     {
         ConsoleColor originalColor = Console.ForegroundColor;
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"ℹ {message}");
+        Console.WriteLine($"[i] {message}");
         Console.ForegroundColor = originalColor;
     }
 }
-

@@ -1,5 +1,7 @@
 namespace MinRide.Models;
 
+using MinRide.Utils;
+
 /// <summary>
 /// Represents a ride in the MinRide system.
 /// Status flow: PENDING → IN_PROGRESS → COMPLETED (or CANCELLED)
@@ -57,6 +59,16 @@ public class Ride
     public string Status { get; set; }
 
     /// <summary>
+    /// Gets or sets the customer's rating for the driver (1-5 stars), null if not rated.
+    /// </summary>
+    public int? CustomerRating { get; set; }
+
+    /// <summary>
+    /// Gets whether the ride has been rated by the customer.
+    /// </summary>
+    public bool IsRated => CustomerRating.HasValue;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="Ride"/> class for a new ride.
     /// </summary>
     /// <param name="rideId">The unique identifier for the ride.</param>
@@ -76,6 +88,7 @@ public class Ride
         Fare = distance * 12000;
         Timestamp = DateTime.Now;
         Status = "PENDING";
+        CustomerRating = null;
     }
 
     /// <summary>
@@ -88,7 +101,8 @@ public class Ride
     /// <param name="fare">The fare for the ride in VND.</param>
     /// <param name="timestamp">The timestamp when the ride was created.</param>
     /// <param name="status">The current status of the ride.</param>
-    public Ride(int rideId, int customerId, int driverId, double distance, double fare, DateTime timestamp, string status)
+    /// <param name="customerRating">The customer's rating for the driver (optional).</param>
+    public Ride(int rideId, int customerId, int driverId, double distance, double fare, DateTime timestamp, string status, int? customerRating = null)
     {
         RideId = rideId;
         CustomerId = customerId;
@@ -97,6 +111,7 @@ public class Ride
         Fare = fare;
         Timestamp = timestamp;
         Status = status;
+        CustomerRating = customerRating;
     }
 
     /// <summary>
@@ -216,21 +231,23 @@ public class Ride
         if (Status == "IN_PROGRESS")
         {
             int remaining = GetRemainingTravelTime();
-            statusInfo = $"IN_PROGRESS ({remaining}s còn lại)";
+            statusInfo = $"ĐANG CHẠY ({remaining}s còn lại)";
         }
-        Console.WriteLine($"RideID: {RideId} | Customer: C{CustomerId} | Driver: D{DriverId} | Distance: {Distance:F1}km | Fare: {Fare:N0} VND | Status: {statusInfo}");
+        string ratingInfo = CustomerRating.HasValue ? $" | Đánh giá: {CustomerRating} sao" : "";
+        string statusLabel = Status == "IN_PROGRESS" ? statusInfo : UIHelper.FormatStatus(Status);
+        Console.WriteLine($"Mã chuyến: {RideId} | Khách: C{CustomerId} | Tài xế: D{DriverId} | Quãng đường: {Distance:F1}km | Giá cước: {Fare:N0} VND | Trạng thái: {statusLabel}{ratingInfo}");
     }
 
     /// <summary>
     /// Converts the ride's data to a CSV-formatted string.
-    /// Only saves COMPLETED rides to CSV.
     /// </summary>
     /// <returns>A comma-separated string containing the ride's data.</returns>
     public string ToCSV()
     {
         // Save as CONFIRMED for backward compatibility (COMPLETED rides)
         string saveStatus = Status == "COMPLETED" ? "CONFIRMED" : Status;
-        return $"{RideId},{CustomerId},{DriverId},{Distance},{Fare},{Timestamp:O},{saveStatus}";
+        string ratingStr = CustomerRating.HasValue ? CustomerRating.Value.ToString() : "";
+        return $"{RideId},{CustomerId},{DriverId},{Distance},{Fare},{Timestamp:O},{saveStatus},{ratingStr}";
     }
 
     /// <summary>
@@ -255,7 +272,14 @@ public class Ride
             // Convert CONFIRMED to COMPLETED for new logic
             if (status == "CONFIRMED") status = "COMPLETED";
 
-            return new Ride(rideId, customerId, driverId, distance, fare, timestamp, status);
+            // Parse customer rating if available (backward compatibility)
+            int? customerRating = null;
+            if (parts.Length >= 8 && !string.IsNullOrWhiteSpace(parts[7]))
+            {
+                customerRating = int.Parse(parts[7]);
+            }
+
+            return new Ride(rideId, customerId, driverId, distance, fare, timestamp, status, customerRating);
         }
         catch (Exception ex) when (ex is IndexOutOfRangeException || ex is FormatException || ex is OverflowException)
         {
@@ -263,4 +287,3 @@ public class Ride
         }
     }
 }
-

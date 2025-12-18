@@ -51,7 +51,7 @@ public class DriverManager
         drivers.Add(driver);
         if (!silent)
         {
-            Console.WriteLine($"✓ Đã thêm tài xế {driver.Name} (ID: {driver.Id})");
+            Console.WriteLine($"[OK] Da them tai xe {driver.Name} (ID: {driver.Id})");
         }
     }
 
@@ -223,19 +223,19 @@ public class DriverManager
         else
         {
             // Multiple drivers with same name
-            Console.WriteLine($"\nTìm thấy {matchingDrivers.Count} tài xế trùng tên:");
-            Console.WriteLine("┌─────┬────────┬────────────────────────┬────────┬─────────────────┬───────────┐");
-            Console.WriteLine("│ STT │   ID   │          Tên           │ Rating │     Vị trí      │ Số chuyến │");
-            Console.WriteLine("├─────┼────────┼────────────────────────┼────────┼─────────────────┼───────────┤");
+            Console.WriteLine($"\nTim thay {matchingDrivers.Count} tai xe trung ten:");
+            Console.WriteLine("+-----+--------+------------------------+--------+-----------------+-----------+");
+            Console.WriteLine("| STT |   ID   |          Ten           | Rating |     Vi tri      | So chuyen |");
+            Console.WriteLine("+-----+--------+------------------------+--------+-----------------+-----------+");
 
             int stt = 1;
             foreach (var d in matchingDrivers)
             {
                 string driverName = d.Name.Length > 22 ? d.Name.Substring(0, 19) + "..." : d.Name;
-                Console.WriteLine($"│ {stt,3} │ {d.Id,6} │ {driverName,-22} │ {d.Rating,6:F1} │ ({d.Location.X:F1}, {d.Location.Y:F1}){"",-5} │ {d.TotalRides,9} │");
+                Console.WriteLine($"| {stt,3} | {d.Id,6} | {driverName,-22} | {d.Rating,6:F1} | ({d.Location.X:F1}, {d.Location.Y:F1}){"",-5} | {d.TotalRides,9} |");
                 stt++;
             }
-            Console.WriteLine("└─────┴────────┴────────────────────────┴────────┴─────────────────┴───────────┘");
+            Console.WriteLine("+-----+--------+------------------------+--------+-----------------+-----------+");
 
             Console.Write("\nNhập ID tài xế cần cập nhật: ");
             if (!int.TryParse(Console.ReadLine(), out int selectedId))
@@ -390,7 +390,7 @@ public class DriverManager
             Console.WriteLine($"Đã hoàn tác cập nhật tài xế ID {driverToUpdate.Id}");
         });
 
-        Console.WriteLine("\n✓ Cập nhật thành công!");
+        Console.WriteLine("\n[OK] Cap nhat thanh cong!");
         Console.WriteLine("--- THÔNG TIN SAU CẬP NHẬT ---");
         driverToUpdate.DisplayDetailed();
     }
@@ -438,6 +438,17 @@ public class DriverManager
     public List<Driver> GetAll()
     {
         return drivers;
+    }
+
+    /// <summary>
+    /// Gets the next available ID for a new driver.
+    /// </summary>
+    /// <returns>The next available driver ID.</returns>
+    public int GetNextId()
+    {
+        if (drivers.Count == 0)
+            return 1;
+        return drivers.Max(d => d.Id) + 1;
     }
 
     /// <summary>
