@@ -32,12 +32,12 @@ public static class FileHandler
         }
         catch (FileNotFoundException)
         {
-            Console.WriteLine($"Error: File not found - {filePath}");
+            Console.WriteLine($"Lỗi: Không tìm thấy file - {filePath}");
             throw;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading drivers: {ex.Message}");
+            Console.WriteLine($"Lỗi tải danh sách tài xế: {ex.Message}");
             throw;
         }
 
@@ -55,7 +55,7 @@ public static class FileHandler
         {
             List<string> lines = new List<string>
             {
-                "ID,Name,Rating,X,Y,TotalRides"
+                "ID,Name,Rating,X,Y,TotalRides,RatingSum,RatingCount"
             };
 
             foreach (var driver in drivers)
@@ -64,11 +64,11 @@ public static class FileHandler
             }
 
             File.WriteAllLines(filePath, lines);
-            Console.WriteLine($"Saved {drivers.Count} driver(s) to {filePath}");
+            Console.WriteLine($"Đã lưu {drivers.Count} tài xế vào {filePath}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error saving drivers: {ex.Message}");
+            Console.WriteLine($"Lỗi lưu danh sách tài xế: {ex.Message}");
             throw;
         }
     }
@@ -98,12 +98,12 @@ public static class FileHandler
         }
         catch (FileNotFoundException)
         {
-            Console.WriteLine($"Error: File not found - {filePath}");
+            Console.WriteLine($"Lỗi: Không tìm thấy file - {filePath}");
             throw;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading customers: {ex.Message}");
+            Console.WriteLine($"Lỗi tải danh sách khách hàng: {ex.Message}");
             throw;
         }
 
@@ -130,11 +130,11 @@ public static class FileHandler
             }
 
             File.WriteAllLines(filePath, lines);
-            Console.WriteLine($"Saved {customers.Count} customer(s) to {filePath}");
+            Console.WriteLine($"Đã lưu {customers.Count} khách hàng vào {filePath}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error saving customers: {ex.Message}");
+            Console.WriteLine($"Lỗi lưu danh sách khách hàng: {ex.Message}");
             throw;
         }
     }
@@ -164,12 +164,12 @@ public static class FileHandler
         }
         catch (FileNotFoundException)
         {
-            Console.WriteLine($"Error: File not found - {filePath}");
+            Console.WriteLine($"Lỗi: Không tìm thấy file - {filePath}");
             throw;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading rides: {ex.Message}");
+            Console.WriteLine($"Lỗi tải danh sách chuyến đi: {ex.Message}");
             throw;
         }
 
@@ -187,7 +187,7 @@ public static class FileHandler
         {
             List<string> lines = new List<string>
             {
-                "RideId,CustomerId,DriverId,Distance,Fare,Timestamp,Status"
+                "RideId,CustomerId,DriverId,Distance,Fare,Timestamp,Status,CustomerRating"
             };
 
             foreach (var ride in rides)
@@ -196,11 +196,11 @@ public static class FileHandler
             }
 
             File.WriteAllLines(filePath, lines);
-            Console.WriteLine($"Saved {rides.Count} ride(s) to {filePath}");
+            Console.WriteLine($"Đã lưu {rides.Count} chuyến đi vào {filePath}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error saving rides: {ex.Message}");
+            Console.WriteLine($"Lỗi lưu danh sách chuyến đi: {ex.Message}");
             throw;
         }
     }

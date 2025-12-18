@@ -63,7 +63,7 @@ public class MinRideSystem
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[X] Loi tai tai xe: {ex.Message}");
+            Console.WriteLine($"[X] Lỗi tải tài xế: {ex.Message}");
         }
 
         // Step 2: Load customers
@@ -81,7 +81,7 @@ public class MinRideSystem
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[X] Loi tai khach hang: {ex.Message}");
+            Console.WriteLine($"[X] Lỗi tải khách hàng: {ex.Message}");
         }
 
         // Step 3: Load rides with validation
@@ -116,11 +116,11 @@ public class MinRideSystem
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[X] Loi tai chuyen di: {ex.Message}");
+            Console.WriteLine($"[X] Lỗi tải chuyến đi: {ex.Message}");
         }
 
         // Show summary
-        Console.WriteLine($"[OK] Da tai: {driverCount} tai xe | {customerCount} khach hang | {rideCount} chuyen di");
+        Console.WriteLine($"[OK] Đã tải: {driverCount} tài xế | {customerCount} khách hàng | {rideCount} chuyến đi");
         if (invalidRideCount > 0)
         {
             Console.WriteLine($"⚠ Bỏ qua {invalidRideCount} chuyến đi không hợp lệ (tài xế/khách hàng không tồn tại)");

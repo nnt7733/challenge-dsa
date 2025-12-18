@@ -1,11 +1,11 @@
-ID,Name,Rating,X,Y,TotalRides
-1,Nguyen Van An,4.8,10.5,20.3,1,72,15
-2,Tran Minh Duc,4.5,15.2,18.7,1,54,12
-3,Le Hoang Nam,4.9,8.3,22.1,1,98,20
-4,Pham Thanh Tung,4.2,12.8,16.5,1,34,8
-5,Vo Quoc Bao,4.7,9.1,19.8,1,85,18
-6,Hoang Duc Thinh,4.4,14.6,21.2,1,44,10
-7,Dang Van Khanh,4.6,11.2,17.9,1,64,14
-8,Bui Minh Quan,4.3,7.5,23.4,1,39,9
-9,Ngo Thanh Son,4.8,13.9,15.6,1,77,16
-10,Truong Van Hai,4.1,16.3,20.8,1,29,7
+ID,Name,Rating,X,Y,TotalRides,RatingSum,RatingCount
+1,Lâm Mạnh Trang,4.9,6.5,2.1,1,88.3,18
+2,Mai Cẩm Tuấn,3.4,6.5,8.5,1,40.3,12
+3,Huỳnh Kim Nga,3.3,8.3,8.5,1,26.7,8
+4,Vũ Cẩm Xuân,4.2,7.9,3,1,62.8,15
+5,Ngô Hồng Xuân,3.4,1.4,7.2,1,27.4,8
+6,Trần Cẩm Phúc,4,3.9,4.1,1,76,19
+7,Lê Khánh Hùng,4.3,6.4,1.2,1,78.1,18
+8,Vũ Xuân Linh,4.7,9.7,0.9,1,93.3,20
+9,Trương Diệu Giang,3.3,9.1,3.5,1,49.8,15
+10,Trương Quang Khoa,3.8,1.3,0.3,1,53.4,14

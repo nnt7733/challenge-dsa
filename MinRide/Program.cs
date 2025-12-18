@@ -43,6 +43,16 @@ class Program
             UIHelper.Line(w);
             Console.WriteLine();
 
+            // Optional: regenerate sample data quickly for friends to clone & test
+            if (args.Any(a => string.Equals(a, "--generate-data", StringComparison.OrdinalIgnoreCase)))
+            {
+                DataGenerator.GenerateAndSaveData(10, 10, 10, "Data");
+                Console.WriteLine();
+                UIHelper.Success("Đã sinh lại dữ liệu mẫu (10 tài xế, 10 khách hàng, 10 chuyến đi).");
+                UIHelper.Info("Bạn có thể chạy lại chương trình để bắt đầu sử dụng dữ liệu mới.");
+                return;
+            }
+
             var system = new MinRideSystem();
             system.Run();
 

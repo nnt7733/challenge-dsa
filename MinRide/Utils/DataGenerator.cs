@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using MinRide.Models;
 
 namespace MinRide.Utils;
@@ -7,28 +9,37 @@ namespace MinRide.Utils;
 /// </summary>
 public static class DataGenerator
 {
-    private static readonly Random random = new Random();
+    // Deterministic seed so sample data is stable across machines (friends can clone & get same results)
+    private static readonly Random random = new Random(20251218);
 
-    private static readonly string[] FirstNames = {
-        "Nguyen", "Tran", "Le", "Pham", "Hoang", "Vo", "Dang", "Bui", "Ngo", "Truong",
-        "Huynh", "Dinh", "Do", "Ly", "Duong", "Vu", "Mai", "Lam", "Ha", "Tang"
+    public const int DefaultDriverStartId = 1;
+    public const int DefaultCustomerStartId = 101;
+    public const int DefaultRideStartId = 1001;
+
+    private static readonly string[] FirstNames =
+    {
+        "Nguyễn", "Trần", "Lê", "Phạm", "Hoàng", "Võ", "Đặng", "Bùi", "Ngô", "Trương",
+        "Huỳnh", "Đinh", "Đỗ", "Lý", "Dương", "Vũ", "Mai", "Lâm", "Hà", "Tăng"
     };
 
-    private static readonly string[] MiddleNames = {
-        "Van", "Thi", "Duc", "Minh", "Quang", "Thanh", "Manh", "Quoc", "Hong", "Tuan",
-        "Mai", "Xuan", "Thu", "Hoai", "Khanh", "Anh", "Bich", "Cam", "Dieu", "Kim"
+    private static readonly string[] MiddleNames =
+    {
+        "Văn", "Thị", "Đức", "Minh", "Quang", "Thanh", "Mạnh", "Quốc", "Hồng", "Tuấn",
+        "Mai", "Xuân", "Thu", "Hoài", "Khánh", "Anh", "Bích", "Cẩm", "Diệu", "Kim"
     };
 
-    private static readonly string[] LastNames = {
-        "An", "Binh", "Cuong", "Dung", "Em", "Phong", "Giang", "Hai", "Khoa", "Lam",
-        "Minh", "Nam", "Oanh", "Phuc", "Quyen", "Son", "Trang", "Uyen", "Vy", "Xuan",
-        "Hoa", "Lan", "Linh", "Nga", "Huong", "Tam", "Tuan", "Hung", "Duc", "Thao"
+    private static readonly string[] LastNames =
+    {
+        "An", "Bình", "Cường", "Dũng", "Em", "Phong", "Giang", "Hải", "Khoa", "Lâm",
+        "Minh", "Nam", "Oanh", "Phúc", "Quyên", "Sơn", "Trang", "Uyên", "Vy", "Xuân",
+        "Hòa", "Lan", "Linh", "Nga", "Hương", "Tâm", "Tuấn", "Hùng", "Đức", "Thảo"
     };
 
-    private static readonly string[] Districts = {
-        "Quan 1", "Quan 3", "Quan 5", "Quan 7", "Quan 10",
-        "Quan Binh Thanh", "Quan Go Vap", "Quan Thu Duc", "Quan Phu Nhuan", "Quan Tan Binh",
-        "Quan Binh Tan", "Quan 2", "Quan 4", "Quan 6", "Quan 8"
+    private static readonly string[] Districts =
+    {
+        "Quận 1", "Quận 3", "Quận 5", "Quận 7", "Quận 10",
+        "Bình Thạnh", "Gò Vấp", "Thủ Đức", "Phú Nhuận", "Tân Bình",
+        "Bình Tân", "Quận 2", "Quận 4", "Quận 6", "Quận 8"
     };
 
     /// <summary>
@@ -72,14 +83,22 @@ public static class DataGenerator
     /// Generates a list of random drivers.
     /// TotalRides will be set to 0 and synced later based on actual rides data.
     /// </summary>
-    public static List<Driver> GenerateDrivers(int count)
+    public static List<Driver> GenerateDrivers(int count, int startId = DefaultDriverStartId)
     {
         var drivers = new List<Driver>();
-        for (int i = 1; i <= count; i++)
+        for (int i = 0; i < count; i++)
         {
             var location = GenerateLocation();
-            var driver = new Driver(i, GenerateName(), GenerateRating(), location.X, location.Y);
-            // TotalRides starts at 0, will be synced with actual rides data
+            int id = startId + i;
+            double rating = GenerateRating();
+            var driver = new Driver(id, GenerateName(), rating, location.X, location.Y);
+
+            // Seed rating history so UI shows "đánh giá" count (RatingSum/RatingCount consistent with Rating)
+            int ratingCount = random.Next(7, 21); // 7..20
+            double ratingSum = Math.Round(rating * ratingCount, 1);
+            driver.SetRatingData(ratingSum, ratingCount);
+
+            // TotalRides starts at 0, will be synced with actual rides data (from rides)
             drivers.Add(driver);
         }
         return drivers;
@@ -88,13 +107,14 @@ public static class DataGenerator
     /// <summary>
     /// Generates a list of random customers.
     /// </summary>
-    public static List<Customer> GenerateCustomers(int count)
+    public static List<Customer> GenerateCustomers(int count, int startId = DefaultCustomerStartId)
     {
         var customers = new List<Customer>();
-        for (int i = 1; i <= count; i++)
+        for (int i = 0; i < count; i++)
         {
             var location = GenerateLocation();
-            var customer = new Customer(i, GenerateName(), GenerateDistrict(), location.X, location.Y);
+            int id = startId + i;
+            var customer = new Customer(id, GenerateName(), GenerateDistrict(), location.X, location.Y);
             customers.Add(customer);
         }
         return customers;
@@ -103,21 +123,38 @@ public static class DataGenerator
     /// <summary>
     /// Generates a list of random rides.
     /// </summary>
-    public static List<Ride> GenerateRides(int count, int maxCustomerId, int maxDriverId)
+    public static List<Ride> GenerateRides(
+        int count,
+        int customerStartId = DefaultCustomerStartId,
+        int driverStartId = DefaultDriverStartId,
+        int rideStartId = DefaultRideStartId,
+        int customerCount = 10,
+        int driverCount = 10)
     {
         var rides = new List<Ride>();
-        var statuses = new[] { "COMPLETED", "COMPLETED", "COMPLETED", "CANCELLED" }; // 75% completed
+        // Make sample data deterministic, consistent, and easy to test:
+        // - Each ride is COMPLETED so rating feature works immediately
+        // - Cover all customers/drivers (round-robin)
+        DateTime baseTime = new DateTime(2024, 12, 15, 8, 30, 0);
 
-        for (int i = 1; i <= count; i++)
+        for (int i = 0; i < count; i++)
         {
-            int customerId = random.Next(1, maxCustomerId + 1);
-            int driverId = random.Next(1, maxDriverId + 1);
-            double distance = Math.Round(1.0 + random.NextDouble() * 10.0, 1);
-            double fare = distance * 12000;
-            DateTime timestamp = DateTime.Now.AddDays(-random.Next(1, 30)).AddHours(-random.Next(0, 24));
-            string status = statuses[random.Next(statuses.Length)];
+            int rideId = rideStartId + i;
+            int safeCustomerCount = Math.Max(1, customerCount);
+            int safeDriverCount = Math.Max(1, driverCount);
+            int customerId = customerStartId + (i % safeCustomerCount);
+            int driverId = driverStartId + (i % safeDriverCount);
 
-            var ride = new Ride(i, customerId, driverId, distance, fare, timestamp, status);
+            // 5.0..15.0 km, deterministic-ish
+            double distance = Math.Round(5.0 + (random.NextDouble() * 10.0), 1);
+            double fare = Math.Round(distance * 12000, 0);
+            DateTime timestamp = baseTime.AddMinutes(i * 45);
+            string status = "COMPLETED";
+
+            // Alternate 5/4 stars for demo
+            int? customerRating = (i % 2 == 0) ? 5 : 4;
+
+            var ride = new Ride(rideId, customerId, driverId, distance, fare, timestamp, status, customerRating);
             rides.Add(ride);
         }
         return rides;
@@ -129,14 +166,20 @@ public static class DataGenerator
     /// </summary>
     public static void GenerateAndSaveData(int driverCount, int customerCount, int rideCount, string dataFolder = "Data")
     {
-        Console.WriteLine($"Generating {driverCount} drivers...");
-        var drivers = GenerateDrivers(driverCount);
+        Console.WriteLine($"Đang sinh {driverCount} tài xế...");
+        var drivers = GenerateDrivers(driverCount, DefaultDriverStartId);
         
-        Console.WriteLine($"Generating {customerCount} customers...");
-        var customers = GenerateCustomers(customerCount);
+        Console.WriteLine($"Đang sinh {customerCount} khách hàng...");
+        var customers = GenerateCustomers(customerCount, DefaultCustomerStartId);
         
-        Console.WriteLine($"Generating {rideCount} rides...");
-        var rides = GenerateRides(rideCount, customerCount, driverCount);
+        Console.WriteLine($"Đang sinh {rideCount} chuyến đi...");
+        var rides = GenerateRides(
+            rideCount,
+            customerStartId: DefaultCustomerStartId,
+            driverStartId: DefaultDriverStartId,
+            rideStartId: DefaultRideStartId,
+            customerCount: customerCount,
+            driverCount: driverCount);
 
         // Sync driver's TotalRides with actual confirmed rides
         var driverDict = drivers.ToDictionary(d => d.Id);
@@ -145,6 +188,10 @@ public static class DataGenerator
             if (driverDict.TryGetValue(ride.DriverId, out var driver))
             {
                 driver.IncrementRides();
+                if (ride.CustomerRating.HasValue)
+                {
+                    driver.AddRating(ride.CustomerRating.Value);
+                }
             }
         }
 
@@ -155,11 +202,12 @@ public static class DataGenerator
         FileHandler.SaveDrivers(Path.Combine(dataFolder, "drivers.csv"), drivers);
         FileHandler.SaveCustomers(Path.Combine(dataFolder, "customers.csv"), customers);
         FileHandler.SaveRides(Path.Combine(dataFolder, "rides.csv"), rides);
+        SavePasswords(Path.Combine(dataFolder, "passwords.csv"), customers, drivers);
 
-        Console.WriteLine("\n[OK] Data generation complete!");
-        Console.WriteLine($"  - Drivers: {driverCount}");
-        Console.WriteLine($"  - Customers: {customerCount}");
-        Console.WriteLine($"  - Rides: {rideCount}");
+        Console.WriteLine("\n[OK] Sinh dữ liệu mẫu hoàn tất!");
+        Console.WriteLine($"  - Tài xế: {driverCount}");
+        Console.WriteLine($"  - Khách hàng: {customerCount}");
+        Console.WriteLine($"  - Chuyến đi: {rideCount}");
     }
 
     /// <summary>
@@ -169,28 +217,47 @@ public static class DataGenerator
     {
         Console.WriteLine();
         Console.WriteLine("+--------------------------------------------+");
-        Console.WriteLine("|          SINH DU LIEU MAU                  |");
+        Console.WriteLine("|          SINH DỮ LIỆU MẪU                  |");
         Console.WriteLine("+--------------------------------------------+");
 
-        Console.Write("Nhap so luong tai xe (mac dinh 10): ");
+        Console.Write("Nhập số lượng tài xế (mặc định 10): ");
         if (!int.TryParse(Console.ReadLine(), out int driverCount) || driverCount <= 0)
         {
             driverCount = 10;
         }
 
-        Console.Write("Nhap so luong khach hang (mac dinh 10): ");
+        Console.Write("Nhập số lượng khách hàng (mặc định 10): ");
         if (!int.TryParse(Console.ReadLine(), out int customerCount) || customerCount <= 0)
         {
             customerCount = 10;
         }
 
-        Console.Write("Nhap so luong chuyen di (mac dinh 5): ");
+        Console.Write("Nhập số lượng chuyến đi (mặc định 10): ");
         if (!int.TryParse(Console.ReadLine(), out int rideCount) || rideCount <= 0)
         {
-            rideCount = 5;
+            rideCount = 10;
         }
 
         Console.WriteLine();
         GenerateAndSaveData(driverCount, customerCount, rideCount);
+    }
+
+    private static void SavePasswords(string filePath, List<Customer> customers, List<Driver> drivers)
+    {
+        var lines = new List<string> { "Username,Password" };
+
+        // Customer: login with ID/ID (username input is numeric ID, but stored key is C{ID})
+        foreach (var c in customers.OrderBy(c => c.Id))
+        {
+            lines.Add($"C{c.Id},{c.Id}");
+        }
+
+        // Driver: login with ID/ID (stored key is D{ID})
+        foreach (var d in drivers.OrderBy(d => d.Id))
+        {
+            lines.Add($"D{d.Id},{d.Id}");
+        }
+
+        File.WriteAllLines(filePath, lines);
     }
 }
