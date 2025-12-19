@@ -45,7 +45,7 @@ public class CustomerMenu
             Console.WriteLine();
             UIHelper.Line();
             UIHelper.Title("MINRIDE - KHÁCH HÀNG");
-            UIHelper.Row($"Xin chào, {UIHelper.Truncate(customer.Name, 35)}");
+            UIHelper.Title($"Xin chào, {UIHelper.Truncate(customer.Name, 35)}");
             UIHelper.Line();
             UIHelper.MenuItem("1", "Xem thông tin cá nhân");
             UIHelper.MenuItem("2", "Cập nhật thông tin");

@@ -40,7 +40,7 @@ public class DriverMenu
             Console.WriteLine();
             UIHelper.Line();
             UIHelper.Title("MINRIDE - TÀI XẾ");
-            UIHelper.Row($"Xin chào, {UIHelper.Truncate(driver.Name, 35)}");
+            UIHelper.Title($"Xin chào, {UIHelper.Truncate(driver.Name, 35)}");
             UIHelper.Row($"Đánh giá: {driver.Rating:F1} sao | Số chuyến: {driver.TotalRides}");
             UIHelper.Line();
             UIHelper.MenuItem("1", "Xem thông tin cá nhân");
