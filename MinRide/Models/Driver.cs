@@ -41,6 +41,11 @@ public class Driver
     public double RatingSum { get; private set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the driver is marked as deleted (soft delete).
+    /// </summary>
+    public bool IsDeleted { get; set; } = false;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="Driver"/> class.
     /// </summary>
     /// <param name="id">The unique identifier for the driver.</param>

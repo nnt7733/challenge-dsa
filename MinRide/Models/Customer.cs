@@ -26,6 +26,11 @@ public class Customer
     public (double X, double Y) Location { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the customer is marked as deleted (soft delete).
+    /// </summary>
+    public bool IsDeleted { get; set; } = false;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="Customer"/> class.
     /// </summary>
     /// <param name="id">The unique identifier for the customer.</param>

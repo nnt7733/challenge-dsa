@@ -1,5 +1,6 @@
 using MinRide.Models;
 using MinRide.Utils;
+using MinRide.Algorithms;
 
 namespace MinRide.Managers;
 
@@ -19,9 +20,14 @@ public class CustomerManager
     private Dictionary<int, int> idToIndex;
 
     /// <summary>
-    /// Maps district name to list of customer IDs in that district.
+    /// Maps district name to list of customer references in that district.
     /// </summary>
-    private Dictionary<string, List<int>> districtIndex;
+    private Dictionary<string, List<Customer>> districtIndex;
+
+    /// <summary>
+    /// Trie data structure for efficient name-based searches.
+    /// </summary>
+    private NameTrie nameTrie;
 
     /// <summary>
     /// The undo stack for reversible operations.
@@ -35,7 +41,8 @@ public class CustomerManager
     {
         customers = new List<Customer>();
         idToIndex = new Dictionary<int, int>();
-        districtIndex = new Dictionary<string, List<int>>();
+        districtIndex = new Dictionary<string, List<Customer>>();
+        nameTrie = new NameTrie();
     }
 
     /// <summary>
@@ -55,14 +62,16 @@ public class CustomerManager
     public void AddCustomer(Customer customer, bool silent = false)
     {
         idToIndex[customer.Id] = customers.Count;
+        customer.IsDeleted = false;
         customers.Add(customer);
+        nameTrie.Insert(customer.Name, customer.Id);
 
         // Add to district index
         if (!districtIndex.ContainsKey(customer.District))
         {
-            districtIndex[customer.District] = new List<int>();
+            districtIndex[customer.District] = new List<Customer>();
         }
-        districtIndex[customer.District].Add(customer.Id);
+        districtIndex[customer.District].Add(customer);
 
         if (!silent)
         {
@@ -71,10 +80,10 @@ public class CustomerManager
     }
 
     /// <summary>
-    /// Deletes a customer from the collection by ID.
+    /// Deletes a customer from the collection by ID using lazy deletion.
     /// </summary>
     /// <param name="id">The ID of the customer to delete.</param>
-    /// <returns><c>true</c> if the customer was deleted; <c>false</c> if not found.</returns>
+    /// <returns><c>true</c> if the customer was marked as deleted; <c>false</c> if not found.</returns>
     public bool DeleteCustomer(int id)
     {
         if (!idToIndex.TryGetValue(id, out int index))
@@ -82,32 +91,21 @@ public class CustomerManager
             return false;
         }
 
-        Customer customerToDelete = customers[index];
+        Customer customer = customers[index];
+
+        // Use lazy deletion - just mark as deleted
+        customer.IsDeleted = true;
+        nameTrie.Remove(customer.Name, id);
 
         // Remove from district index
-        if (districtIndex.TryGetValue(customerToDelete.District, out var districtCustomers))
+        if (districtIndex.TryGetValue(customer.District, out var districtCustomers))
         {
-            districtCustomers.Remove(id);
+            districtCustomers.Remove(customer);
             if (districtCustomers.Count == 0)
             {
-                districtIndex.Remove(customerToDelete.District);
+                districtIndex.Remove(customer.District);
             }
         }
-
-        // Remove from idToIndex
-        idToIndex.Remove(id);
-
-        // Swap with last element if not already the last
-        int lastIndex = customers.Count - 1;
-        if (index != lastIndex)
-        {
-            Customer lastCustomer = customers[lastIndex];
-            customers[index] = lastCustomer;
-            idToIndex[lastCustomer.Id] = index;
-        }
-
-        // Remove last element
-        customers.RemoveAt(lastIndex);
 
         return true;
     }
@@ -116,24 +114,57 @@ public class CustomerManager
     /// Finds a customer by their ID using O(1) dictionary lookup.
     /// </summary>
     /// <param name="id">The ID of the customer to find.</param>
-    /// <returns>The customer if found; otherwise, <c>null</c>.</returns>
+    /// <returns>The customer if found and not deleted; otherwise, <c>null</c>.</returns>
     public Customer? FindCustomerById(int id)
     {
         if (idToIndex.TryGetValue(id, out int index))
         {
-            return customers[index];
+            Customer customer = customers[index];
+            // Return null if the customer is marked as deleted
+            return customer.IsDeleted ? null : customer;
         }
         return null;
     }
 
     /// <summary>
-    /// Finds all customers whose name contains the specified search string.
+    /// Finds all customers whose name starts with the specified prefix using Trie.
+    /// Time complexity: O(L + M) where L is prefix length and M is number of matching customers.
+    /// </summary>
+    /// <param name="prefix">The name prefix to search for.</param>
+    /// <returns>A list of customers matching the prefix and not deleted.</returns>
+    public List<Customer> FindCustomersByNamePrefix(string prefix)
+    {
+        if (string.IsNullOrEmpty(prefix))
+            return new List<Customer>();
+
+        List<int> matchingIds = nameTrie.SearchByPrefix(prefix);
+        var result = new List<Customer>();
+
+        foreach (int id in matchingIds)
+        {
+            if (idToIndex.TryGetValue(id, out int index))
+            {
+                Customer customer = customers[index];
+                if (!customer.IsDeleted)
+                {
+                    result.Add(customer);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Finds all customers whose name contains the specified search string (substring search).
     /// </summary>
     /// <param name="name">The name or partial name to search for.</param>
-    /// <returns>A list of customers matching the search criteria.</returns>
+    /// <returns>A list of customers matching the search criteria and not deleted.</returns>
     public List<Customer> FindCustomersByName(string name)
     {
-        return customers.Where(c => c.Name.Contains(name, StringComparison.OrdinalIgnoreCase)).ToList();
+        return customers
+            .Where(c => !c.IsDeleted && c.Name.Contains(name, StringComparison.OrdinalIgnoreCase))
+            .ToList();
     }
 
     /// <summary>
@@ -144,72 +175,74 @@ public class CustomerManager
     /// <returns>A list of top K customers.</returns>
     public List<Customer> GetTopK(int k, bool highest = true)
     {
+        var activeCustomers = customers.Where(c => !c.IsDeleted).ToList();
         return highest
-            ? customers.OrderByDescending(c => c.Id).Take(k).ToList()
-            : customers.OrderBy(c => c.Id).Take(k).ToList();
+            ? activeCustomers.OrderByDescending(c => c.Id).Take(k).ToList()
+            : activeCustomers.OrderBy(c => c.Id).Take(k).ToList();
     }
 
     /// <summary>
-    /// Gets customers in a specific district with pagination support.
+    /// Gets customers in a specific district with pagination support using optimized index.
     /// </summary>
     /// <param name="district">The district name to filter by.</param>
     /// <param name="skip">The number of customers to skip. Default is 0.</param>
     /// <param name="take">The maximum number of customers to return. Default is 10.</param>
-    /// <returns>A list of customers in the specified district.</returns>
+    /// <returns>A list of active customers in the specified district.</returns>
     public List<Customer> GetCustomersByDistrict(string district, int skip = 0, int take = 10)
     {
-        if (!districtIndex.TryGetValue(district, out var customerIds))
+        if (!districtIndex.TryGetValue(district, out var districtCustomers))
         {
             return new List<Customer>();
         }
 
-        return customerIds
-            .OrderBy(id => id)
+        // Filter out deleted customers and apply pagination
+        return districtCustomers
+            .Where(c => !c.IsDeleted)
+            .OrderBy(c => c.Id)
             .Skip(skip)
             .Take(take)
-            .Select(id => FindCustomerById(id))
-            .Where(c => c != null)
-            .Cast<Customer>()
             .ToList();
     }
 
     /// <summary>
-    /// Gets the count of customers in a specific district.
+    /// Gets the count of active customers in a specific district.
     /// </summary>
     /// <param name="district">The district name to count.</param>
-    /// <returns>The number of customers in the district, or 0 if the district doesn't exist.</returns>
+    /// <returns>The number of active customers in the district, or 0 if the district doesn't exist.</returns>
     public int GetDistrictCount(string district)
     {
-        return districtIndex.TryGetValue(district, out var customerIds) ? customerIds.Count : 0;
+        if (!districtIndex.TryGetValue(district, out var districtCustomers))
+            return 0;
+        return districtCustomers.Count(c => !c.IsDeleted);
     }
 
     /// <summary>
-    /// Displays all customers in the collection.
+    /// Displays all customers in the collection (excluding deleted ones).
     /// </summary>
     public void DisplayAll()
     {
-        foreach (var customer in customers)
+        foreach (var customer in customers.Where(c => !c.IsDeleted))
         {
             customer.Display();
         }
     }
 
     /// <summary>
-    /// Gets all customers in the collection.
+    /// Gets all customers in the collection (excluding deleted ones).
     /// </summary>
-    /// <returns>The list of all customers.</returns>
+    /// <returns>The list of all active customers.</returns>
     public List<Customer> GetAll()
     {
-        return customers;
+        return customers.Where(c => !c.IsDeleted).ToList();
     }
 
     /// <summary>
-    /// Gets the total count of customers.
+    /// Gets the total count of active customers.
     /// </summary>
-    /// <returns>The number of customers in the collection.</returns>
+    /// <returns>The number of active customers in the collection.</returns>
     public int GetCount()
     {
-        return customers.Count;
+        return customers.Count(c => !c.IsDeleted);
     }
 
     /// <summary>
@@ -255,13 +288,21 @@ public class CustomerManager
         double oldX = customer.Location.X;
         double oldY = customer.Location.Y;
 
+        // Update Trie if name is changing
+        if (newName != null && newName != oldName)
+        {
+            nameTrie.Remove(oldName, id);
+            customer.Name = newName;
+            nameTrie.Insert(newName, id);
+        }
+
         // Update district index if district is changing
         if (newDistrict != null && newDistrict != oldDistrict)
         {
             // Remove from old district
             if (districtIndex.TryGetValue(oldDistrict, out var oldDistrictList))
             {
-                oldDistrictList.Remove(id);
+                oldDistrictList.Remove(customer);
                 if (oldDistrictList.Count == 0)
                 {
                     districtIndex.Remove(oldDistrict);
@@ -271,19 +312,14 @@ public class CustomerManager
             // Add to new district
             if (!districtIndex.ContainsKey(newDistrict))
             {
-                districtIndex[newDistrict] = new List<int>();
+                districtIndex[newDistrict] = new List<Customer>();
             }
-            districtIndex[newDistrict].Add(id);
+            districtIndex[newDistrict].Add(customer);
 
             customer.District = newDistrict;
         }
 
         // Update other fields
-        if (newName != null)
-        {
-            customer.Name = newName;
-        }
-
         if (newX.HasValue || newY.HasValue)
         {
             double x = newX ?? customer.Location.X;
@@ -294,12 +330,20 @@ public class CustomerManager
         // Push undo action
         undoStack?.Push(() =>
         {
+            // Restore Trie if name was changed
+            if (oldName != customer.Name)
+            {
+                nameTrie.Remove(customer.Name, id);
+                customer.Name = oldName;
+                nameTrie.Insert(oldName, id);
+            }
+
             // Restore district index
             if (oldDistrict != customer.District)
             {
                 if (districtIndex.TryGetValue(customer.District, out var currentDistrictList))
                 {
-                    currentDistrictList.Remove(id);
+                    currentDistrictList.Remove(customer);
                     if (currentDistrictList.Count == 0)
                     {
                         districtIndex.Remove(customer.District);
@@ -308,12 +352,11 @@ public class CustomerManager
 
                 if (!districtIndex.ContainsKey(oldDistrict))
                 {
-                    districtIndex[oldDistrict] = new List<int>();
+                    districtIndex[oldDistrict] = new List<Customer>();
                 }
-                districtIndex[oldDistrict].Add(id);
+                districtIndex[oldDistrict].Add(customer);
             }
 
-            customer.Name = oldName;
             customer.District = oldDistrict;
             customer.Location = (oldX, oldY);
             Console.WriteLine($"Đã hoàn tác cập nhật khách hàng ID: {id}");

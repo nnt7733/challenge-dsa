@@ -20,6 +20,12 @@ public class RideManager
     private Dictionary<int, List<Ride>> driverRides;
 
     /// <summary>
+    /// Index for driver rides optimization: Maps DriverID to list of LinkedListNode references.
+    /// Allows O(1) access to driver's rides instead of O(N) LinkedList traversal.
+    /// </summary>
+    private Dictionary<int, List<LinkedListNode<Ride>>> driverRideIndex;
+
+    /// <summary>
     /// Queue of pending rides waiting to start (can be cancelled within 2 min).
     /// </summary>
     private Queue<Ride> pendingRides;
@@ -41,6 +47,7 @@ public class RideManager
     {
         rideHistory = new LinkedList<Ride>();
         driverRides = new Dictionary<int, List<Ride>>();
+        driverRideIndex = new Dictionary<int, List<LinkedListNode<Ride>>>();
         pendingRides = new Queue<Ride>();
         inProgressRides = new List<Ride>();
         nextRideId = 1;
@@ -179,14 +186,21 @@ public class RideManager
             inProgressRides.Remove(ride);
             
             // Add to ride history
-            rideHistory.AddLast(ride);
+            var node = rideHistory.AddLast(ride);
 
-            // Add to driver rides
+            // Add to driver rides dictionary
             if (!driverRides.ContainsKey(ride.DriverId))
             {
                 driverRides[ride.DriverId] = new List<Ride>();
             }
             driverRides[ride.DriverId].Add(ride);
+
+            // Add node reference to driver ride index for O(1) access
+            if (!driverRideIndex.ContainsKey(ride.DriverId))
+            {
+                driverRideIndex[ride.DriverId] = new List<LinkedListNode<Ride>>();
+            }
+            driverRideIndex[ride.DriverId].Add(node);
 
             // Update driver's TotalRides
             if (driverManager != null)
@@ -261,16 +275,21 @@ public class RideManager
 
     /// <summary>
     /// Gets all rides for a specific driver, sorted by timestamp.
+    /// Optimized using driver ride index: O(1) index lookup + O(k log k) sorting where k = driver's rides.
+    /// Previous implementation was O(N) LinkedList traversal where N = total rides.
     /// </summary>
     /// <param name="driverId">The ID of the driver.</param>
     /// <returns>A list of rides for the driver, sorted by timestamp ascending.</returns>
     public List<Ride> GetRidesByDriver(int driverId)
     {
-        if (!driverRides.TryGetValue(driverId, out var rides))
+        // O(1) index lookup instead of O(N) LinkedList traversal
+        if (!driverRideIndex.TryGetValue(driverId, out var nodeList))
         {
             return new List<Ride>();
         }
 
+        // Extract rides from nodes and sort by timestamp
+        var rides = nodeList.Select(node => node.Value).ToList();
         return rides.OrderBy(r => r.Timestamp).ToList();
     }
 
@@ -425,7 +444,7 @@ public class RideManager
     public void AddRideFromHistory(Ride ride)
     {
         // Add to ride history
-        rideHistory.AddLast(ride);
+        var node = rideHistory.AddLast(ride);
 
         // Add to driver rides dictionary
         if (!driverRides.ContainsKey(ride.DriverId))
@@ -433,6 +452,13 @@ public class RideManager
             driverRides[ride.DriverId] = new List<Ride>();
         }
         driverRides[ride.DriverId].Add(ride);
+
+        // Add node reference to driver ride index for O(1) access
+        if (!driverRideIndex.ContainsKey(ride.DriverId))
+        {
+            driverRideIndex[ride.DriverId] = new List<LinkedListNode<Ride>>();
+        }
+        driverRideIndex[ride.DriverId].Add(node);
 
         // Update nextRideId if needed
         if (ride.RideId >= nextRideId)

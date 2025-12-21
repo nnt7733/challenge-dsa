@@ -1,5 +1,6 @@
 using MinRide.Models;
 using MinRide.Utils;
+using MinRide.Algorithms;
 
 namespace MinRide.Managers;
 
@@ -19,6 +20,22 @@ public class DriverManager
     private Dictionary<int, int> idToIndex;
 
     /// <summary>
+    /// Trie data structure for efficient name-based searches.
+    /// </summary>
+    private NameTrie nameTrie;
+
+    /// <summary>
+    /// Grid-based spatial index for efficient nearby driver searches.
+    /// Key: Grid cell coordinates (int, int), Value: List of drivers in that cell.
+    /// </summary>
+    private Dictionary<(int, int), List<Driver>> gridIndex;
+
+    /// <summary>
+    /// Size of each grid cell in distance units (e.g., 2.0 km).
+    /// </summary>
+    private const double CellSize = 2.0;
+
+    /// <summary>
     /// The undo stack for reversible operations.
     /// </summary>
     private UndoStack? undoStack;
@@ -30,6 +47,8 @@ public class DriverManager
     {
         drivers = new List<Driver>();
         idToIndex = new Dictionary<int, int>();
+        nameTrie = new NameTrie();
+        gridIndex = new Dictionary<(int, int), List<Driver>>();
     }
 
     /// <summary>
@@ -48,7 +67,18 @@ public class DriverManager
     public void AddDriver(Driver driver, bool silent = false)
     {
         idToIndex[driver.Id] = drivers.Count;
+        driver.IsDeleted = false;
         drivers.Add(driver);
+        nameTrie.Insert(driver.Name, driver.Id);
+        
+        // Add to grid index
+        var cellKey = GetCellKey(driver.Location.X, driver.Location.Y);
+        if (!gridIndex.ContainsKey(cellKey))
+        {
+            gridIndex[cellKey] = new List<Driver>();
+        }
+        gridIndex[cellKey].Add(driver);
+        
         if (!silent)
         {
             Console.WriteLine($"[OK] Da them tai xe {driver.Name} (ID: {driver.Id})");
@@ -56,10 +86,10 @@ public class DriverManager
     }
 
     /// <summary>
-    /// Deletes a driver from the collection by ID.
+    /// Deletes a driver from the collection by ID using lazy deletion.
     /// </summary>
     /// <param name="id">The ID of the driver to delete.</param>
-    /// <returns><c>true</c> if the driver was deleted; <c>false</c> if not found.</returns>
+    /// <returns><c>true</c> if the driver was marked as deleted; <c>false</c> if not found.</returns>
     public bool DeleteDriver(int id)
     {
         if (!idToIndex.TryGetValue(id, out int index))
@@ -67,20 +97,22 @@ public class DriverManager
             return false;
         }
 
-        // Remove from dictionary
-        idToIndex.Remove(id);
-
-        // If not the last element, swap with last element
-        int lastIndex = drivers.Count - 1;
-        if (index != lastIndex)
+        Driver driver = drivers[index];
+        
+        // Use lazy deletion - just mark as deleted
+        driver.IsDeleted = true;
+        nameTrie.Remove(driver.Name, id);
+        
+        // Remove from grid index
+        var cellKey = GetCellKey(driver.Location.X, driver.Location.Y);
+        if (gridIndex.TryGetValue(cellKey, out var driverList))
         {
-            Driver lastDriver = drivers[lastIndex];
-            drivers[index] = lastDriver;
-            idToIndex[lastDriver.Id] = index;
+            driverList.Remove(driver);
+            if (driverList.Count == 0)
+            {
+                gridIndex.Remove(cellKey);
+            }
         }
-
-        // Remove last element
-        drivers.RemoveAt(lastIndex);
 
         return true;
     }
@@ -89,24 +121,57 @@ public class DriverManager
     /// Finds a driver by their ID using O(1) dictionary lookup.
     /// </summary>
     /// <param name="id">The ID of the driver to find.</param>
-    /// <returns>The driver if found; otherwise, <c>null</c>.</returns>
+    /// <returns>The driver if found and not deleted; otherwise, <c>null</c>.</returns>
     public Driver? FindDriverById(int id)
     {
         if (idToIndex.TryGetValue(id, out int index))
         {
-            return drivers[index];
+            Driver driver = drivers[index];
+            // Return null if the driver is marked as deleted
+            return driver.IsDeleted ? null : driver;
         }
         return null;
     }
 
     /// <summary>
-    /// Finds all drivers whose name contains the specified search string.
+    /// Finds all drivers whose name starts with the specified prefix using Trie.
+    /// Time complexity: O(L + M) where L is prefix length and M is number of matching drivers.
+    /// </summary>
+    /// <param name="prefix">The name prefix to search for.</param>
+    /// <returns>A list of drivers matching the prefix and not deleted.</returns>
+    public List<Driver> FindDriversByNamePrefix(string prefix)
+    {
+        if (string.IsNullOrEmpty(prefix))
+            return new List<Driver>();
+
+        List<int> matchingIds = nameTrie.SearchByPrefix(prefix);
+        var result = new List<Driver>();
+
+        foreach (int id in matchingIds)
+        {
+            if (idToIndex.TryGetValue(id, out int index))
+            {
+                Driver driver = drivers[index];
+                if (!driver.IsDeleted)
+                {
+                    result.Add(driver);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Finds all drivers whose name contains the specified search string (substring search).
     /// </summary>
     /// <param name="name">The name or partial name to search for.</param>
-    /// <returns>A list of drivers matching the search criteria.</returns>
+    /// <returns>A list of drivers matching the search criteria and not deleted.</returns>
     public List<Driver> FindDriversByName(string name)
     {
-        return drivers.Where(d => d.Name.Contains(name, StringComparison.OrdinalIgnoreCase)).ToList();
+        return drivers
+            .Where(d => !d.IsDeleted && d.Name.Contains(name, StringComparison.OrdinalIgnoreCase))
+            .ToList();
     }
 
     /// <summary>
@@ -116,15 +181,16 @@ public class DriverManager
     public void SortByRating(bool ascending = false)
     {
         drivers = ascending
-            ? drivers.OrderBy(d => d.Rating).ToList()
-            : drivers.OrderByDescending(d => d.Rating).ToList();
+            ? drivers.Where(d => !d.IsDeleted).OrderBy(d => d.Rating).ToList()
+            : drivers.Where(d => !d.IsDeleted).OrderByDescending(d => d.Rating).ToList();
 
         // Rebuild idToIndex dictionary
         RebuildIndex();
     }
 
     /// <summary>
-    /// Gets the top K drivers sorted by rating.
+    /// Gets the top K drivers sorted by rating using Min-Heap optimization.
+    /// Optimized using PriorityQueue for O(n + k*log(k)) complexity instead of O(n*log(n)).
     /// </summary>
     /// <param name="k">The number of drivers to return.</param>
     /// <param name="highest">If <c>true</c>, returns highest rated; otherwise, lowest rated. Default is highest.</param>
@@ -132,19 +198,80 @@ public class DriverManager
     public List<Driver> GetTopK(int k, bool fromStart = true)
     {
         // Validate k parameter
-        if (k <= 0 || drivers.Count == 0)
+        if (k <= 0)
+        {
+            return new List<Driver>();
+        }
+
+        var activeDrivers = drivers.Where(d => !d.IsDeleted).ToList();
+        if (activeDrivers.Count == 0)
         {
             return new List<Driver>();
         }
 
         // Limit k to actual driver count
-        k = Math.Min(k, drivers.Count);
+        k = Math.Min(k, activeDrivers.Count);
 
-        // fromStart = true: Top K with HIGHEST rating (đầu danh sách = tốt nhất)
-        // fromStart = false: Top K with LOWEST rating (cuối danh sách = kém nhất)
-        return fromStart
-            ? drivers.OrderByDescending(d => d.Rating).Take(k).ToList()
-            : drivers.OrderBy(d => d.Rating).Take(k).ToList();
+        if (fromStart)
+        {
+            // Get Top K HIGHEST rated drivers using Min-Heap
+            // Keep a min-heap of size K. When new element is larger than min, replace it.
+            // This gives us the K highest elements with O(n + k*log(k)) complexity
+            var minHeap = new PriorityQueue<Driver, double>();
+            
+            foreach (var driver in activeDrivers)
+            {
+                if (minHeap.Count < k)
+                {
+                    minHeap.Enqueue(driver, driver.Rating);
+                }
+                else if (driver.Rating > minHeap.Peek().Rating)
+                {
+                    // Remove min and add new driver with higher rating
+                    minHeap.Dequeue();
+                    minHeap.Enqueue(driver, driver.Rating);
+                }
+            }
+            
+            // Extract from heap and sort by rating descending
+            var result = new List<Driver>();
+            while (minHeap.Count > 0)
+            {
+                result.Add(minHeap.Dequeue());
+            }
+            result.Reverse(); // Reverse to get descending order
+            return result;
+        }
+        else
+        {
+            // Get Top K LOWEST rated drivers using Max-Heap (inverted priority)
+            // Keep a max-heap of size K. When new element is smaller than max, replace it.
+            var maxHeap = new PriorityQueue<Driver, double>();
+            
+            foreach (var driver in activeDrivers)
+            {
+                if (maxHeap.Count < k)
+                {
+                    // Use negative rating for max-heap behavior
+                    maxHeap.Enqueue(driver, -driver.Rating);
+                }
+                else if (driver.Rating < -maxHeap.Peek().Rating)
+                {
+                    // Remove max and add new driver with lower rating
+                    maxHeap.Dequeue();
+                    maxHeap.Enqueue(driver, -driver.Rating);
+                }
+            }
+            
+            // Extract from heap and sort by rating ascending
+            var result = new List<Driver>();
+            while (maxHeap.Count > 0)
+            {
+                result.Add(maxHeap.Dequeue());
+            }
+            result.Reverse(); // Reverse to get ascending order
+            return result;
+        }
     }
 
     /// <summary>
@@ -374,18 +501,87 @@ public class DriverManager
         }
 
         // Apply updates
-        if (newName != null) driverToUpdate.Name = newName;
-        if (newRating.HasValue) driverToUpdate.SetRating(newRating.Value);
+        if (newName != null)
+        {
+            nameTrie.Remove(driverToUpdate.Name, driverToUpdate.Id);
+            driverToUpdate.Name = newName;
+            nameTrie.Insert(newName, driverToUpdate.Id);
+        }
+        
+        if (newRating.HasValue)
+            driverToUpdate.SetRating(newRating.Value);
+        
         if (newX.HasValue || newY.HasValue)
         {
-            driverToUpdate.Location = (newX ?? oldX, newY ?? oldY);
+            double newLocationX = newX ?? oldX;
+            double newLocationY = newY ?? oldY;
+            
+            // Update grid index if location is changing
+            if (newLocationX != oldX || newLocationY != oldY)
+            {
+                var oldCellKey = GetCellKey(oldX, oldY);
+                var newCellKey = GetCellKey(newLocationX, newLocationY);
+                
+                // Remove from old cell
+                if (oldCellKey != newCellKey)
+                {
+                    if (gridIndex.TryGetValue(oldCellKey, out var oldCellDrivers))
+                    {
+                        oldCellDrivers.Remove(driverToUpdate);
+                        if (oldCellDrivers.Count == 0)
+                        {
+                            gridIndex.Remove(oldCellKey);
+                        }
+                    }
+                    
+                    // Add to new cell
+                    if (!gridIndex.ContainsKey(newCellKey))
+                    {
+                        gridIndex[newCellKey] = new List<Driver>();
+                    }
+                    gridIndex[newCellKey].Add(driverToUpdate);
+                }
+            }
+            
+            driverToUpdate.Location = (newLocationX, newLocationY);
         }
 
         // Push undo action
         undoStack?.Push(() =>
         {
-            driverToUpdate.Name = oldName;
+            if (newName != null && driverToUpdate.Name != oldName)
+            {
+                nameTrie.Remove(driverToUpdate.Name, driverToUpdate.Id);
+                driverToUpdate.Name = oldName;
+                nameTrie.Insert(oldName, driverToUpdate.Id);
+            }
             driverToUpdate.SetRating(oldRating);
+            
+            // Restore grid index if location was changed
+            if (driverToUpdate.Location.X != oldX || driverToUpdate.Location.Y != oldY)
+            {
+                var currentCellKey = GetCellKey(driverToUpdate.Location.X, driverToUpdate.Location.Y);
+                var oldCellKey = GetCellKey(oldX, oldY);
+                
+                if (currentCellKey != oldCellKey)
+                {
+                    if (gridIndex.TryGetValue(currentCellKey, out var currentCellDrivers))
+                    {
+                        currentCellDrivers.Remove(driverToUpdate);
+                        if (currentCellDrivers.Count == 0)
+                        {
+                            gridIndex.Remove(currentCellKey);
+                        }
+                    }
+                    
+                    if (!gridIndex.ContainsKey(oldCellKey))
+                    {
+                        gridIndex[oldCellKey] = new List<Driver>();
+                    }
+                    gridIndex[oldCellKey].Add(driverToUpdate);
+                }
+            }
+            
             driverToUpdate.Location = (oldX, oldY);
             Console.WriteLine($"Đã hoàn tác cập nhật tài xế ID {driverToUpdate.Id}");
         });
@@ -396,48 +592,194 @@ public class DriverManager
     }
 
     /// <summary>
-    /// Gets the total count of drivers.
+    /// Gets the total count of drivers (excluding deleted ones).
     /// </summary>
-    /// <returns>The number of drivers in the collection.</returns>
+    /// <returns>The number of active drivers in the collection.</returns>
     public int GetCount()
     {
-        return drivers.Count;
+        return drivers.Count(d => !d.IsDeleted);
     }
 
     /// <summary>
-    /// Finds all drivers within a specified radius of a location, sorted by distance and rating.
+    /// Finds the K nearest drivers to a location using grid-based spatial partitioning and Min-Heap optimization.
+    /// More efficient than finding all drivers and then sorting, especially for large datasets.
+    /// Time Complexity: O(m log k) where m = candidates found, k = results to return.
+    /// </summary>
+    /// <param name="location">The center location as (X, Y) coordinates.</param>
+    /// <param name="k">The number of nearest drivers to return.</param>
+    /// <returns>A list of (Distance, Driver) tuples for the K nearest drivers, sorted by distance.</returns>
+    public List<(double Distance, Driver Driver)> FindTopNearestDrivers((double X, double Y) location, int k)
+    {
+        if (k <= 0)
+        {
+            return new List<(double Distance, Driver Driver)>();
+        }
+
+        // Use Max-Heap to keep track of K nearest drivers
+        // Priority is inverted (negative distance) so we can use max-heap as min-heap
+        var maxHeap = new PriorityQueue<(double Distance, Driver Driver), double>();
+        double maxDistance = double.MaxValue;
+
+        // Search in expanding radius using grid
+        // Start with initial step and expand if needed
+        for (int currentStep = 0; currentStep <= 10; currentStep++)
+        {
+            var centerCell = GetCellKey(location.X, location.Y);
+            
+            // Broad Phase: Collect drivers from grid cells at current step
+            var candidateDrivers = new HashSet<Driver>();
+            for (int dx = -currentStep; dx <= currentStep; dx++)
+            {
+                for (int dy = -currentStep; dy <= currentStep; dy++)
+                {
+                    var cellKey = (centerCell.Item1 + dx, centerCell.Item2 + dy);
+                    if (gridIndex.TryGetValue(cellKey, out var driversInCell))
+                    {
+                        foreach (var driver in driversInCell)
+                        {
+                            if (!driver.IsDeleted)
+                            {
+                                candidateDrivers.Add(driver);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Narrow Phase: Calculate distances and maintain heap of K smallest
+            foreach (var driver in candidateDrivers)
+            {
+                double distance = driver.DistanceTo(location);
+                
+                // If heap not full, add this driver
+                if (maxHeap.Count < k)
+                {
+                    maxHeap.Enqueue((distance, driver), -distance); // Negative for min-heap behavior
+                    maxDistance = Math.Max(maxDistance, distance);
+                }
+                // If distance is better (smaller) than worst in heap, replace it
+                else if (distance < maxDistance)
+                {
+                    maxHeap.Dequeue();
+                    maxHeap.Enqueue((distance, driver), -distance);
+                    
+                    // Update maxDistance - peek at the top element
+                    if (maxHeap.Count > 0)
+                    {
+                        var temp = maxHeap.Dequeue();
+                        maxDistance = temp.Distance;
+                        maxHeap.Enqueue(temp, -temp.Distance);
+                    }
+                }
+            }
+
+            // If we have K drivers, we can stop searching
+            if (maxHeap.Count >= k)
+            {
+                break;
+            }
+        }
+
+        // Extract from heap in reverse order to get sorted result
+        var result = new List<(double Distance, Driver Driver)>();
+        while (maxHeap.Count > 0)
+        {
+            result.Add(maxHeap.Dequeue());
+        }
+        result.Reverse(); // Reverse to get ascending distance order
+        return result;
+    }
+
+    /// <summary>
+    /// Finds all drivers within a specified radius of a location using grid-based spatial partitioning.
+    /// Uses two-phase approach: Broad Phase (grid cells) and Narrow Phase (exact distance calculation).
+    /// Time Complexity: O((2*step+1)^2 * k + m*log(m)) where step = ceil(radius/CellSize), k = avg drivers per cell, m = matches
+    /// Much faster than O(n) linear scan for sparse data.
     /// </summary>
     /// <param name="location">The center location as (X, Y) coordinates.</param>
     /// <param name="radius">The maximum distance from the location.</param>
     /// <returns>A list of tuples containing (Distance, Driver), sorted by distance ascending then rating descending.</returns>
     public List<(double Distance, Driver Driver)> FindNearbyDrivers((double X, double Y) location, double radius)
     {
-        return drivers
-            .Select(d => (Distance: d.DistanceTo(location), Driver: d))
-            .Where(t => t.Distance <= radius)
-            .OrderBy(t => t.Distance)
-            .ThenByDescending(t => t.Driver.Rating)
-            .ToList();
+        var result = new List<(double Distance, Driver Driver)>();
+        
+        // Calculate grid cell and search range
+        var centerCell = GetCellKey(location.X, location.Y);
+        int step = (int)Math.Ceiling(radius / CellSize);
+        
+        // Broad Phase: Collect drivers from nearby grid cells
+        var candidateDrivers = new HashSet<Driver>();
+        for (int dx = -step; dx <= step; dx++)
+        {
+            for (int dy = -step; dy <= step; dy++)
+            {
+                var cellKey = (centerCell.Item1 + dx, centerCell.Item2 + dy);
+                if (gridIndex.TryGetValue(cellKey, out var driversInCell))
+                {
+                    foreach (var driver in driversInCell)
+                    {
+                        candidateDrivers.Add(driver);
+                    }
+                }
+            }
+        }
+        
+        // Narrow Phase: Calculate exact distances and filter using Min-Heap for efficiency
+        // Use heap to maintain sorted order incrementally
+        var minHeap = new PriorityQueue<(double Distance, Driver Driver), (double, double)>();
+        
+        foreach (var driver in candidateDrivers)
+        {
+            if (driver.IsDeleted) continue;
+            
+            double distance = driver.DistanceTo(location);
+            if (distance <= radius)
+            {
+                // Add to heap with composite priority: distance ascending, rating descending
+                minHeap.Enqueue((distance, driver), (distance, -driver.Rating));
+            }
+        }
+        
+        // Extract from heap to get sorted result
+        while (minHeap.Count > 0)
+        {
+            result.Add(minHeap.Dequeue());
+        }
+        
+        return result;
     }
 
     /// <summary>
-    /// Displays all drivers in the collection.
+    /// Calculates the grid cell key for a given coordinate.
+    /// </summary>
+    /// <param name="x">The X coordinate (latitude).</param>
+    /// <param name="y">The Y coordinate (longitude).</param>
+    /// <returns>The grid cell coordinates as (int, int).</returns>
+    private (int, int) GetCellKey(double x, double y)
+    {
+        int cellX = (int)(x / CellSize);
+        int cellY = (int)(y / CellSize);
+        return (cellX, cellY);
+    }
+
+    /// <summary>
+    /// Displays all drivers in the collection (excluding deleted ones).
     /// </summary>
     public void DisplayAll()
     {
-        foreach (var driver in drivers)
+        foreach (var driver in drivers.Where(d => !d.IsDeleted))
         {
             driver.Display();
         }
     }
 
     /// <summary>
-    /// Gets all drivers in the collection.
+    /// Gets all drivers in the collection (excluding deleted ones).
     /// </summary>
-    /// <returns>The list of all drivers.</returns>
+    /// <returns>The list of all active drivers.</returns>
     public List<Driver> GetAll()
     {
-        return drivers;
+        return drivers.Where(d => !d.IsDeleted).ToList();
     }
 
     /// <summary>
@@ -493,10 +835,12 @@ public class DriverManager
         double oldX = driver.Location.X;
         double oldY = driver.Location.Y;
 
-        // Update only non-null parameters
-        if (newName != null)
+        // Update Trie if name is changing
+        if (newName != null && newName != oldName)
         {
+            nameTrie.Remove(oldName, id);
             driver.Name = newName;
+            nameTrie.Insert(newName, id);
         }
 
         if (newRating.HasValue)
@@ -508,14 +852,75 @@ public class DriverManager
         {
             double x = newX ?? driver.Location.X;
             double y = newY ?? driver.Location.Y;
+            
+            // Update grid index if location is changing
+            if (x != oldX || y != oldY)
+            {
+                var oldCellKey = GetCellKey(oldX, oldY);
+                var newCellKey = GetCellKey(x, y);
+                
+                // Remove from old cell
+                if (oldCellKey != newCellKey)
+                {
+                    if (gridIndex.TryGetValue(oldCellKey, out var oldCellDrivers))
+                    {
+                        oldCellDrivers.Remove(driver);
+                        if (oldCellDrivers.Count == 0)
+                        {
+                            gridIndex.Remove(oldCellKey);
+                        }
+                    }
+                    
+                    // Add to new cell
+                    if (!gridIndex.ContainsKey(newCellKey))
+                    {
+                        gridIndex[newCellKey] = new List<Driver>();
+                    }
+                    gridIndex[newCellKey].Add(driver);
+                }
+            }
+            
             driver.Location = (x, y);
         }
 
         // Push undo action
         undoStack?.Push(() =>
         {
-            driver.Name = oldName;
+            if (oldName != driver.Name)
+            {
+                nameTrie.Remove(driver.Name, id);
+                driver.Name = oldName;
+                nameTrie.Insert(oldName, id);
+            }
             driver.SetRating(oldRating);
+            
+            // Restore grid index if location was changed
+            double currentX = driver.Location.X;
+            double currentY = driver.Location.Y;
+            if (currentX != oldX || currentY != oldY)
+            {
+                var currentCellKey = GetCellKey(currentX, currentY);
+                var oldCellKey = GetCellKey(oldX, oldY);
+                
+                if (currentCellKey != oldCellKey)
+                {
+                    if (gridIndex.TryGetValue(currentCellKey, out var currentCellDrivers))
+                    {
+                        currentCellDrivers.Remove(driver);
+                        if (currentCellDrivers.Count == 0)
+                        {
+                            gridIndex.Remove(currentCellKey);
+                        }
+                    }
+                    
+                    if (!gridIndex.ContainsKey(oldCellKey))
+                    {
+                        gridIndex[oldCellKey] = new List<Driver>();
+                    }
+                    gridIndex[oldCellKey].Add(driver);
+                }
+            }
+            
             driver.Location = (oldX, oldY);
             Console.WriteLine($"Đã hoàn tác cập nhật tài xế ID: {id}");
         });
