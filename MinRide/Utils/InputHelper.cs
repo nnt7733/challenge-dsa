@@ -27,11 +27,11 @@ public static class InputHelper
                 {
                     return value;
                 }
-                MenuHelper.ShowError($"Giá trị phải từ {min} đến {max}.");
+                UIHelper.Error($"Giá trị phải từ {min} đến {max}.");
             }
             else
             {
-                MenuHelper.ShowError("Vui lòng nhập số nguyên hợp lệ.");
+                UIHelper.Error("Vui lòng nhập số nguyên hợp lệ.");
             }
         }
     }
@@ -56,11 +56,11 @@ public static class InputHelper
                 {
                     return value;
                 }
-                MenuHelper.ShowError($"Giá trị phải từ {min} đến {max}.");
+                UIHelper.Error($"Giá trị phải từ {min} đến {max}.");
             }
             else
             {
-                MenuHelper.ShowError("Vui lòng nhập số hợp lệ.");
+                UIHelper.Error("Vui lòng nhập số hợp lệ.");
             }
         }
     }
@@ -83,7 +83,7 @@ public static class InputHelper
                 return input ?? "";
             }
 
-            MenuHelper.ShowError("Giá trị không được để trống.");
+            UIHelper.Error("Giá trị không được để trống.");
         }
     }
 
@@ -122,7 +122,7 @@ public static class InputHelper
                 return result;
             }
 
-            MenuHelper.ShowError("Lựa chọn không hợp lệ.");
+            UIHelper.Error("Lựa chọn không hợp lệ.");
         }
     }
 
@@ -144,7 +144,7 @@ public static class InputHelper
                 return result;
             }
 
-            MenuHelper.ShowError($"Định dạng không hợp lệ. Vui lòng nhập theo định dạng {format}.");
+            UIHelper.Error($"Định dạng không hợp lệ. Vui lòng nhập theo định dạng {format}.");
         }
     }
 
@@ -171,7 +171,7 @@ public static class InputHelper
                 return result;
             }
 
-            MenuHelper.ShowError($"Định dạng không hợp lệ. Vui lòng nhập theo định dạng {format}.");
+            UIHelper.Error($"Định dạng không hợp lệ. Vui lòng nhập theo định dạng {format}.");
             Console.Write($"{prompt} ({format}): ");
             input = Console.ReadLine();
         }

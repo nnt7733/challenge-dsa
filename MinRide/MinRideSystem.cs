@@ -135,7 +135,7 @@ public class MinRideSystem
         mainMenu.Run();
 
         // Save data before exiting
-                    SaveData();
+        SaveData();
     }
 
     /// <summary>
@@ -144,13 +144,13 @@ public class MinRideSystem
     private void SaveData()
     {
         try
-    {
-        // Ensure Data directory exists
-        Directory.CreateDirectory("Data");
+        {
+            // Ensure Data directory exists
+            Directory.CreateDirectory("Data");
 
-        FileHandler.SaveDrivers(DriversFilePath, driverManager.GetAll());
-        FileHandler.SaveCustomers(CustomersFilePath, customerManager.GetAll());
-        FileHandler.SaveRides(RidesFilePath, rideManager.GetAllRides());
+            FileHandler.SaveDrivers(DriversFilePath, driverManager.GetAll());
+            FileHandler.SaveCustomers(CustomersFilePath, customerManager.GetAll());
+            FileHandler.SaveRides(RidesFilePath, rideManager.GetAllRides());
             authManager.SavePasswords();
 
             Console.WriteLine("[OK] Đã lưu dữ liệu tự động.");
