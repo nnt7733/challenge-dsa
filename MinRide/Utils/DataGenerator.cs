@@ -90,15 +90,10 @@ public static class DataGenerator
         {
             var location = GenerateLocation();
             int id = startId + i;
-            double rating = GenerateRating();
-            var driver = new Driver(id, GenerateName(), rating, location.X, location.Y);
+            // Rating will be calculated from actual rides, use default 5.0 for new drivers
+            var driver = new Driver(id, GenerateName(), 5.0, location.X, location.Y);
 
-            // Seed rating history so UI shows "đánh giá" count (RatingSum/RatingCount consistent with Rating)
-            int ratingCount = random.Next(7, 21); // 7..20
-            double ratingSum = Math.Round(rating * ratingCount, 1);
-            driver.SetRatingData(ratingSum, ratingCount);
-
-            // TotalRides starts at 0, will be synced with actual rides data (from rides)
+            // TotalRides and Rating will be synced with actual rides data
             drivers.Add(driver);
         }
         return drivers;
@@ -181,8 +176,17 @@ public static class DataGenerator
             customerCount: customerCount,
             driverCount: driverCount);
 
-        // Sync driver's TotalRides with actual confirmed rides
+        // Sync driver's TotalRides and Rating with actual confirmed rides
+        // Reset rating data first to avoid double-counting
         var driverDict = drivers.ToDictionary(d => d.Id);
+        foreach (var driver in drivers)
+        {
+            // Reset rating data - will be recalculated from actual rides
+            // If no ratings from rides, driver keeps default 5.0 rating
+            driver.SetRatingData(0, 0);
+        }
+
+        // Now sync from actual rides
         foreach (var ride in rides.Where(r => r.Status == "COMPLETED"))
         {
             if (driverDict.TryGetValue(ride.DriverId, out var driver))

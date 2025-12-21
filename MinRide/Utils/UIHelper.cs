@@ -227,7 +227,7 @@ public static class UIHelper
     }
 
     /// <summary>
-    /// Ride history table columns: RideID, Tai xe, Quang dg, Gia cuoc, Danh gia
+    /// Ride history table columns: RideID, Tai xe, Quang dg, Gia cuoc, Thoi gian
     /// </summary>
     public static class RideTable
     {
@@ -235,26 +235,26 @@ public static class UIHelper
         private const int WDriver = 16;
         private const int WDist = 9;
         private const int WFare = 13;
-        private const int WRate = 7;
+        private const int WTime = 14;
 
-        private static string Sep => $"+{new string('-', WRide + 2)}+{new string('-', WDriver + 2)}+{new string('-', WDist + 2)}+{new string('-', WFare + 2)}+{new string('-', WRate + 2)}+";
+        private static string Sep => $"+{new string('-', WRide + 2)}+{new string('-', WDriver + 2)}+{new string('-', WDist + 2)}+{new string('-', WFare + 2)}+{new string('-', WTime + 2)}+";
 
         public static void DrawHeader()
         {
             Console.WriteLine(Sep);
-            Console.WriteLine($"| {"Mã",WRide} | {"Tài xế",-WDriver} | {"Quãng",WDist} | {"Giá cước",WFare} | {"Đ.giá",-WRate} |");
+            Console.WriteLine($"| {"Mã",WRide} | {"Tài xế",-WDriver} | {"Quãng",WDist} | {"Giá cước",WFare} | {"Thời gian",-WTime} |");
             Console.WriteLine(Sep);
         }
 
         public static void DrawSeparator() => Console.WriteLine(Sep);
 
-        public static void DrawRow(int rideId, string driverName, string distance, string fare, string rating)
+        public static void DrawRow(int rideId, string driverName, string distance, string fare, string time)
         {
             string d = Truncate(driverName, WDriver);
             string dist = Truncate(distance, WDist);
             string f = Truncate(fare, WFare);
-            string r = Truncate(rating, WRate);
-            Console.WriteLine($"| {rideId,WRide} | {d,-WDriver} | {dist,WDist} | {f,WFare} | {r,-WRate} |");
+            string t = Truncate(time, WTime);
+            Console.WriteLine($"| {rideId,WRide} | {d,-WDriver} | {dist,WDist} | {f,WFare} | {t,-WTime} |");
         }
     }
 
@@ -289,41 +289,39 @@ public static class UIHelper
     }
 
     /// <summary>
-    /// Driver ride history: RideID, Ngay, Quang duong, Gia cuoc, Danh gia
+    /// Driver ride history: RideID, Thoi gian, Quang duong, Gia cuoc
     /// </summary>
     public static class DriverRideTable
     {
         private const int WRide = 6;
-        private const int WDate = 10;
+        private const int WTime = 14;
         private const int WDist = 10;
         private const int WFare = 14;
-        private const int WRate = 7;
 
-        private static string Sep => $"+{new string('-', WRide + 2)}+{new string('-', WDate + 2)}+{new string('-', WDist + 2)}+{new string('-', WFare + 2)}+{new string('-', WRate + 2)}+";
+        private static string Sep => $"+{new string('-', WRide + 2)}+{new string('-', WTime + 2)}+{new string('-', WDist + 2)}+{new string('-', WFare + 2)}+";
 
         public static void DrawHeader()
         {
             Console.WriteLine(Sep);
-            Console.WriteLine($"| {"Mã",WRide} | {"Ngày",-WDate} | {"Quãng",WDist} | {"Giá cước",WFare} | {"Đ.giá",-WRate} |");
+            Console.WriteLine($"| {"Mã",WRide} | {"Thời gian",-WTime} | {"Quãng",WDist} | {"Giá cước",WFare} |");
             Console.WriteLine(Sep);
         }
 
         public static void DrawSeparator() => Console.WriteLine(Sep);
 
-        public static void DrawRow(int rideId, string date, string distance, string fare, string rating)
+        public static void DrawRow(int rideId, string time, string distance, string fare)
         {
-            string dt = Truncate(date, WDate);
+            string t = Truncate(time, WTime);
             string dist = Truncate(distance, WDist);
             string f = Truncate(fare, WFare);
-            string r = Truncate(rating, WRate);
-            Console.WriteLine($"| {rideId,WRide} | {dt,-WDate} | {dist,WDist} | {f,WFare} | {r,-WRate} |");
+            Console.WriteLine($"| {rideId,WRide} | {t,-WTime} | {dist,WDist} | {f,WFare} |");
         }
 
         public static void DrawTotalRow(string totalDist, string totalFare)
         {
             string dist = Truncate(totalDist, WDist);
             string fare = Truncate(totalFare, WFare);
-            Console.WriteLine($"| {"",WRide} | {"TỔNG",-WDate} | {dist,WDist} | {fare,WFare} | {"",-WRate} |");
+            Console.WriteLine($"| {"",WRide} | {"TỔNG",-WTime} | {dist,WDist} | {fare,WFare} |");
         }
     }
 

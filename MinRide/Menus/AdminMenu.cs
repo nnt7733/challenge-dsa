@@ -398,14 +398,16 @@ public class AdminMenu
 
     private void DisplayRideHistory()
     {
-        var rides = rideManager.GetAllRides();
+        var rides = rideManager.GetAllRides()
+            .Where(r => r.Status == "COMPLETED")
+            .OrderByDescending(r => r.Timestamp)
+            .ToList();
         if (rides.Count == 0) { Console.WriteLine("\nChưa có lịch sử chuyến đi."); return; }
 
-        Console.WriteLine($"\n--- LỊCH SỬ CHUYẾN ĐI ({rides.Count}) ---");
-        foreach (var r in rides.OrderByDescending(r => r.Timestamp).Take(20))
+        Console.WriteLine($"\n--- LỊCH SỬ CHUYẾN ĐI ({rides.Count} chuyến) ---");
+        foreach (var r in rides.Take(20))
         {
-            string rating = r.CustomerRating.HasValue ? $"{r.CustomerRating} sao" : "Chưa";
-            Console.WriteLine($"  #{r.RideId,-4} | C{r.CustomerId,-3} -> D{r.DriverId,-3} | {r.Distance,5:F1}km | {r.Fare,10:N0}đ | {UIHelper.FormatStatus(r.Status),-10} | {rating}");
+            Console.WriteLine($"  #{r.RideId,-4} | C{r.CustomerId,-3} -> D{r.DriverId,-3} | {r.Distance,5:F1}km | {r.Fare,10:N0}đ | {r.Timestamp:dd/MM/yy HH:mm}");
         }
     }
 

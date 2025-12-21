@@ -154,13 +154,11 @@ public class DriverMenu
 
         foreach (var ride in rides.Take(20))
         {
-            string rating = ride.CustomerRating.HasValue ? $"{ride.CustomerRating} sao" : "---";
             UIHelper.DriverRideTable.DrawRow(
                 ride.RideId,
-                ride.Timestamp.ToString("dd/MM/yyyy"),
+                ride.Timestamp.ToString("dd/MM/yy HH:mm"),
                 $"{ride.Distance:F1} km",
-                $"{ride.Fare:N0} đ",
-                rating
+                $"{ride.Fare:N0} đ"
             );
             totalFare += ride.Fare;
             totalDistance += ride.Distance;

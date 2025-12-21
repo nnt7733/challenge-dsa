@@ -322,7 +322,9 @@ public class CustomerMenu
         if (customer == null) return;
 
         var completedRides = rideManager.GetRidesByCustomer(customer.Id)
-            .Where(r => r.Status == "COMPLETED").ToList();
+            .Where(r => r.Status == "COMPLETED")
+            .OrderByDescending(r => r.Timestamp)
+            .ToList();
 
         if (completedRides.Count == 0)
         {
@@ -336,13 +338,12 @@ public class CustomerMenu
         foreach (var ride in completedRides.Take(20))
         {
             var driver = driverManager.FindDriverById(ride.DriverId);
-            string rating = ride.CustomerRating.HasValue ? $"{ride.CustomerRating} sao" : "---";
             UIHelper.RideTable.DrawRow(
                 ride.RideId,
                 UIHelper.Truncate(driver?.Name ?? "N/A", 16),
                 $"{ride.Distance:F1} km",
                 $"{ride.Fare:N0} đ",
-                rating
+                ride.Timestamp.ToString("dd/MM/yy HH:mm")
             );
         }
         UIHelper.RideTable.DrawSeparator();

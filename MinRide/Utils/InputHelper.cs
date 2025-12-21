@@ -194,7 +194,7 @@ public static class InputHelper
 
         while (!int.TryParse(input, out int value))
         {
-            MenuHelper.ShowError("Vui lòng nhập số nguyên hợp lệ.");
+            UIHelper.Error("Vui lòng nhập số nguyên hợp lệ.");
             Console.Write($"{prompt}: ");
             input = Console.ReadLine();
 
@@ -224,7 +224,7 @@ public static class InputHelper
 
         while (!double.TryParse(input, out double value))
         {
-            MenuHelper.ShowError("Vui lòng nhập số hợp lệ.");
+            UIHelper.Error("Vui lòng nhập số hợp lệ.");
             Console.Write($"{prompt}: ");
             input = Console.ReadLine();
 
