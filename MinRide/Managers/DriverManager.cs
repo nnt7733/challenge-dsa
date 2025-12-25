@@ -20,9 +20,14 @@ public class DriverManager
     private Dictionary<int, int> idToIndex;
 
     /// <summary>
-    /// Trie data structure for efficient name-based searches.
+    /// Trie data structure for efficient prefix-based name searches.
     /// </summary>
     private NameTrie nameTrie;
+
+    /// <summary>
+    /// Suffix Tree data structure for efficient substring-based name searches.
+    /// </summary>
+    private SuffixTree suffixTree;
 
     /// <summary>
     /// Grid-based spatial index for efficient nearby driver searches.
@@ -48,6 +53,7 @@ public class DriverManager
         drivers = new List<Driver>();
         idToIndex = new Dictionary<int, int>();
         nameTrie = new NameTrie();
+        suffixTree = new SuffixTree();
         gridIndex = new Dictionary<(int, int), List<Driver>>();
     }
 
@@ -70,6 +76,7 @@ public class DriverManager
         driver.IsDeleted = false;
         drivers.Add(driver);
         nameTrie.Insert(driver.Name, driver.Id);
+        suffixTree.Insert(driver.Name, driver.Id);
         
         // Add to grid index
         var cellKey = GetCellKey(driver.Location.X, driver.Location.Y);
@@ -102,6 +109,7 @@ public class DriverManager
         // Use lazy deletion - just mark as deleted
         driver.IsDeleted = true;
         nameTrie.Remove(driver.Name, id);
+        suffixTree.Remove(driver.Name, id);
         
         // Remove from grid index
         var cellKey = GetCellKey(driver.Location.X, driver.Location.Y);
@@ -163,29 +171,32 @@ public class DriverManager
     }
 
     /// <summary>
-    /// Finds all drivers whose name contains the specified search string (substring search).
+    /// Finds all drivers whose name contains the specified search string (substring search) using Suffix Tree.
+    /// Optimized with O(L + M) complexity where L is substring length and M is number of matches.
     /// </summary>
     /// <param name="name">The name or partial name to search for.</param>
     /// <returns>A list of drivers matching the search criteria and not deleted.</returns>
     public List<Driver> FindDriversByName(string name)
     {
-        return drivers
-            .Where(d => !d.IsDeleted && d.Name.Contains(name, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-    }
+        if (string.IsNullOrEmpty(name))
+            return new List<Driver>();
 
-    /// <summary>
-    /// Sorts all drivers by their rating.
-    /// </summary>
-    /// <param name="ascending">If <c>true</c>, sorts in ascending order; otherwise, descending. Default is descending.</param>
-    public void SortByRating(bool ascending = false)
-    {
-        drivers = ascending
-            ? drivers.Where(d => !d.IsDeleted).OrderBy(d => d.Rating).ToList()
-            : drivers.Where(d => !d.IsDeleted).OrderByDescending(d => d.Rating).ToList();
+        List<int> matchingIds = suffixTree.SearchBySubstring(name);
+        var result = new List<Driver>();
 
-        // Rebuild idToIndex dictionary
-        RebuildIndex();
+        foreach (int id in matchingIds)
+        {
+            if (idToIndex.TryGetValue(id, out int index))
+            {
+                Driver driver = drivers[index];
+                if (!driver.IsDeleted)
+                {
+                    result.Add(driver);
+                }
+            }
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -504,8 +515,10 @@ public class DriverManager
         if (newName != null)
         {
             nameTrie.Remove(driverToUpdate.Name, driverToUpdate.Id);
+            suffixTree.Remove(driverToUpdate.Name, driverToUpdate.Id);
             driverToUpdate.Name = newName;
             nameTrie.Insert(newName, driverToUpdate.Id);
+            suffixTree.Insert(newName, driverToUpdate.Id);
         }
         
         if (newRating.HasValue)
@@ -552,8 +565,10 @@ public class DriverManager
             if (newName != null && driverToUpdate.Name != oldName)
             {
                 nameTrie.Remove(driverToUpdate.Name, driverToUpdate.Id);
+                suffixTree.Remove(driverToUpdate.Name, driverToUpdate.Id);
                 driverToUpdate.Name = oldName;
                 nameTrie.Insert(oldName, driverToUpdate.Id);
+                suffixTree.Insert(oldName, driverToUpdate.Id);
             }
             driverToUpdate.SetRating(oldRating);
             
@@ -750,6 +765,117 @@ public class DriverManager
     }
 
     /// <summary>
+    /// Finds the top-rated driver within a specified radius using O(m) linear scan.
+    /// Optimized for Top 1 selection - no need to sort all candidates.
+    /// </summary>
+    /// <param name="location">The center location as (X, Y) coordinates.</param>
+    /// <param name="radius">The maximum distance from the location.</param>
+    /// <returns>A tuple containing (Distance, Driver) for the highest-rated driver, or null if none found.</returns>
+    public (double Distance, Driver Driver)? FindTopRatedDriverInRadius((double X, double Y) location, double radius)
+    {
+        var centerCell = GetCellKey(location.X, location.Y);
+        int step = (int)Math.Ceiling(radius / CellSize);
+
+        // Broad Phase: Collect candidates from grid
+        var candidateDrivers = new HashSet<Driver>();
+        for (int dx = -step; dx <= step; dx++)
+        {
+            for (int dy = -step; dy <= step; dy++)
+            {
+                var cellKey = (centerCell.Item1 + dx, centerCell.Item2 + dy);
+                if (gridIndex.TryGetValue(cellKey, out var driversInCell))
+                {
+                    foreach (var driver in driversInCell)
+                    {
+                        if (!driver.IsDeleted)
+                            candidateDrivers.Add(driver);
+                    }
+                }
+            }
+        }
+
+        // Narrow Phase: Find max rating in single pass - O(m)
+        (double Distance, Driver Driver)? best = null;
+        double maxRating = -1;
+
+        foreach (var driver in candidateDrivers)
+        {
+            double distance = driver.DistanceTo(location);
+            if (distance <= radius && driver.Rating > maxRating)
+            {
+                maxRating = driver.Rating;
+                best = (distance, driver);
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// Finds the best balanced driver (distance + rating weighted score) within a specified radius.
+    /// Uses O(m) linear scan optimized for Top 1 selection.
+    /// </summary>
+    /// <param name="location">The center location as (X, Y) coordinates.</param>
+    /// <param name="radius">The maximum distance from the location.</param>
+    /// <returns>A tuple containing (Distance, Driver) for the best balanced driver, or null if none found.</returns>
+    public (double Distance, Driver Driver)? FindBestBalancedDriverInRadius((double X, double Y) location, double radius)
+    {
+        var centerCell = GetCellKey(location.X, location.Y);
+        int step = (int)Math.Ceiling(radius / CellSize);
+
+        // Broad Phase: Collect candidates
+        var candidateDrivers = new HashSet<Driver>();
+        for (int dx = -step; dx <= step; dx++)
+        {
+            for (int dy = -step; dy <= step; dy++)
+            {
+                var cellKey = (centerCell.Item1 + dx, centerCell.Item2 + dy);
+                if (gridIndex.TryGetValue(cellKey, out var driversInCell))
+                {
+                    foreach (var driver in driversInCell)
+                    {
+                        if (!driver.IsDeleted)
+                            candidateDrivers.Add(driver);
+                    }
+                }
+            }
+        }
+
+        // Step 1: Find max distance (needed for score calculation)
+        double maxDist = 0;
+        var candidatesWithDistance = new List<(double Distance, Driver Driver)>();
+        
+        foreach (var driver in candidateDrivers)
+        {
+            double distance = driver.DistanceTo(location);
+            if (distance <= radius)
+            {
+                candidatesWithDistance.Add((distance, driver));
+                if (distance > maxDist)
+                    maxDist = distance;
+            }
+        }
+
+        if (maxDist == 0) maxDist = 1;
+
+        // Step 2: Find max score in single pass - O(m)
+        (double Distance, Driver Driver)? best = null;
+        double maxScore = -1;
+
+        foreach (var (distance, driver) in candidatesWithDistance)
+        {
+            double score = ((maxDist - distance) / maxDist) * 0.6 + (driver.Rating / 5.0) * 0.4;
+            if (score > maxScore)
+            {
+                maxScore = score;
+                best = (distance, driver);
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
     /// Calculates the grid cell key for a given coordinate.
     /// </summary>
     /// <param name="x">The X coordinate (latitude).</param>
@@ -835,12 +961,14 @@ public class DriverManager
         double oldX = driver.Location.X;
         double oldY = driver.Location.Y;
 
-        // Update Trie if name is changing
+        // Update Trie and SuffixTree if name is changing
         if (newName != null && newName != oldName)
         {
             nameTrie.Remove(oldName, id);
+            suffixTree.Remove(oldName, id);
             driver.Name = newName;
             nameTrie.Insert(newName, id);
+            suffixTree.Insert(newName, id);
         }
 
         if (newRating.HasValue)
@@ -889,8 +1017,10 @@ public class DriverManager
             if (oldName != driver.Name)
             {
                 nameTrie.Remove(driver.Name, id);
+                suffixTree.Remove(driver.Name, id);
                 driver.Name = oldName;
                 nameTrie.Insert(oldName, id);
+                suffixTree.Insert(oldName, id);
             }
             driver.SetRating(oldRating);
             

@@ -25,9 +25,14 @@ public class CustomerManager
     private Dictionary<string, List<Customer>> districtIndex;
 
     /// <summary>
-    /// Trie data structure for efficient name-based searches.
+    /// Trie data structure for efficient prefix-based name searches.
     /// </summary>
     private NameTrie nameTrie;
+
+    /// <summary>
+    /// Suffix Tree data structure for efficient substring-based name searches.
+    /// </summary>
+    private SuffixTree suffixTree;
 
     /// <summary>
     /// The undo stack for reversible operations.
@@ -43,6 +48,7 @@ public class CustomerManager
         idToIndex = new Dictionary<int, int>();
         districtIndex = new Dictionary<string, List<Customer>>();
         nameTrie = new NameTrie();
+        suffixTree = new SuffixTree();
     }
 
     /// <summary>
@@ -65,6 +71,7 @@ public class CustomerManager
         customer.IsDeleted = false;
         customers.Add(customer);
         nameTrie.Insert(customer.Name, customer.Id);
+        suffixTree.Insert(customer.Name, customer.Id);
 
         // Add to district index
         if (!districtIndex.ContainsKey(customer.District))
@@ -96,6 +103,7 @@ public class CustomerManager
         // Use lazy deletion - just mark as deleted
         customer.IsDeleted = true;
         nameTrie.Remove(customer.Name, id);
+        suffixTree.Remove(customer.Name, id);
 
         // Remove from district index
         if (districtIndex.TryGetValue(customer.District, out var districtCustomers))
@@ -156,29 +164,32 @@ public class CustomerManager
     }
 
     /// <summary>
-    /// Finds all customers whose name contains the specified search string (substring search).
+    /// Finds all customers whose name contains the specified search string (substring search) using Suffix Tree.
+    /// Optimized with O(L + M) complexity where L is substring length and M is number of matches.
     /// </summary>
     /// <param name="name">The name or partial name to search for.</param>
     /// <returns>A list of customers matching the search criteria and not deleted.</returns>
     public List<Customer> FindCustomersByName(string name)
     {
-        return customers
-            .Where(c => !c.IsDeleted && c.Name.Contains(name, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-    }
+        if (string.IsNullOrEmpty(name))
+            return new List<Customer>();
 
-    /// <summary>
-    /// Gets the top K customers sorted by ID.
-    /// </summary>
-    /// <param name="k">The number of customers to return.</param>
-    /// <param name="highest">If <c>true</c>, returns highest IDs; otherwise, lowest IDs. Default is highest.</param>
-    /// <returns>A list of top K customers.</returns>
-    public List<Customer> GetTopK(int k, bool highest = true)
-    {
-        var activeCustomers = customers.Where(c => !c.IsDeleted).ToList();
-        return highest
-            ? activeCustomers.OrderByDescending(c => c.Id).Take(k).ToList()
-            : activeCustomers.OrderBy(c => c.Id).Take(k).ToList();
+        List<int> matchingIds = suffixTree.SearchBySubstring(name);
+        var result = new List<Customer>();
+
+        foreach (int id in matchingIds)
+        {
+            if (idToIndex.TryGetValue(id, out int index))
+            {
+                Customer customer = customers[index];
+                if (!customer.IsDeleted)
+                {
+                    result.Add(customer);
+                }
+            }
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -288,12 +299,14 @@ public class CustomerManager
         double oldX = customer.Location.X;
         double oldY = customer.Location.Y;
 
-        // Update Trie if name is changing
+        // Update Trie and SuffixTree if name is changing
         if (newName != null && newName != oldName)
         {
             nameTrie.Remove(oldName, id);
+            suffixTree.Remove(oldName, id);
             customer.Name = newName;
             nameTrie.Insert(newName, id);
+            suffixTree.Insert(newName, id);
         }
 
         // Update district index if district is changing
@@ -330,12 +343,14 @@ public class CustomerManager
         // Push undo action
         undoStack?.Push(() =>
         {
-            // Restore Trie if name was changed
+            // Restore Trie and SuffixTree if name was changed
             if (oldName != customer.Name)
             {
                 nameTrie.Remove(customer.Name, id);
+                suffixTree.Remove(customer.Name, id);
                 customer.Name = oldName;
                 nameTrie.Insert(oldName, id);
+                suffixTree.Insert(oldName, id);
             }
 
             // Restore district index

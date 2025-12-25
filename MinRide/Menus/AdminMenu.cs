@@ -107,7 +107,8 @@ public class AdminMenu
             UIHelper.MenuItem("4", "Xóa tài xế theo ID");
             UIHelper.MenuItem("5", "Tìm kiếm tài xế theo tên");
             UIHelper.MenuItem("6", "Tìm kiếm tài xế theo ID");
-            UIHelper.MenuItem("7", "Quay lại");
+            UIHelper.MenuItem("7", "Top K tài xế đánh giá cao nhất");
+            UIHelper.MenuItem("8", "Quay lại");
             UIHelper.Line();
 
             switch (UIHelper.PromptChoice("Chọn: "))
@@ -118,7 +119,8 @@ public class AdminMenu
                 case "4": DeleteDriver(); break;
                 case "5": SearchDriverByName(); break;
                 case "6": SearchDriverById(); break;
-                case "7": back = true; break;
+                case "7": DisplayTopKDrivers(); break;
+                case "8": back = true; break;
                 default: UIHelper.Error("Lựa chọn không hợp lệ."); break;
             }
         }
@@ -233,6 +235,22 @@ public class AdminMenu
             Console.WriteLine($"  ID: {d.Id,4} | {UIHelper.Truncate(d.Name, 20),-20} | Rating: {d.Rating:F1} | Vi tri: ({d.Location.X:F1}, {d.Location.Y:F1})");
     }
 
+    private void DisplayTopKDrivers()
+    {
+        if (!int.TryParse(UIHelper.Prompt("Nhập số lượng tài xế cần hiển thị (K): "), out int k) || k <= 0)
+        { UIHelper.Error("Số lượng không hợp lệ."); return; }
+
+        var topDrivers = driverManager.GetTopK(k, true);
+        if (topDrivers.Count == 0) { Console.WriteLine("Không có tài xế nào."); return; }
+
+        Console.WriteLine($"\n--- TOP {topDrivers.Count} TAI XE ĐÁNH GIÁ CAO NHẤT ---");
+        int stt = 1;
+        foreach (var d in topDrivers)
+        {
+            Console.WriteLine($"  {stt++}. ID: {d.Id,4} | {UIHelper.Truncate(d.Name, 20),-20} | Rating: {d.Rating:F1} | Chuyến: {d.TotalRides}");
+        }
+    }
+
     private void SearchDriverById()
     {
         if (!int.TryParse(UIHelper.Prompt("Nhập ID tài xế: "), out int id)) { UIHelper.Error("ID không hợp lệ."); return; }
@@ -264,7 +282,8 @@ public class AdminMenu
             UIHelper.MenuItem("4", "Xóa khách hàng theo ID");
             UIHelper.MenuItem("5", "Tìm kiếm khách hàng theo tên");
             UIHelper.MenuItem("6", "Tìm kiếm khách hàng theo ID");
-            UIHelper.MenuItem("7", "Quay lại");
+            UIHelper.MenuItem("7", "Xem khách hàng theo quận");
+            UIHelper.MenuItem("8", "Quay lại");
             UIHelper.Line();
 
             switch (UIHelper.PromptChoice("Chọn: "))
@@ -275,7 +294,8 @@ public class AdminMenu
                 case "4": DeleteCustomer(); break;
                 case "5": SearchCustomerByName(); break;
                 case "6": SearchCustomerById(); break;
-                case "7": back = true; break;
+                case "7": SearchCustomersByDistrict(); break;
+                case "8": back = true; break;
                 default: UIHelper.Error("Lựa chọn không hợp lệ."); break;
             }
         }
@@ -346,6 +366,14 @@ public class AdminMenu
         Console.WriteLine($"\n--- TÌM THẤY {customers.Count} KHÁCH HÀNG ---");
         foreach (var c in customers)
             Console.WriteLine($"  ID: {c.Id,4} | {UIHelper.Truncate(c.Name, 20),-20} | {UIHelper.Truncate(c.District, 15),-15} | ({c.Location.X:F1}, {c.Location.Y:F1})");
+    }
+
+    private void SearchCustomersByDistrict()
+    {
+        string? district = UIHelper.Prompt("Nhập tên quận/huyện: ");
+        if (string.IsNullOrEmpty(district)) { UIHelper.Error("Quận/huyện không được để trống."); return; }
+
+        customerManager.DisplayCustomersByDistrictPaginated(district);
     }
 
     private void SearchCustomerById()
@@ -425,15 +453,38 @@ public class AdminMenu
         var customer = customerManager.FindCustomerById(customerId);
         if (customer == null) { UIHelper.Error("Không tìm thấy khách hàng."); return; }
 
-        if (!double.TryParse(UIHelper.Prompt("Nhập bán kính tìm kiếm (km): "), out double radius) || radius <= 0)
-        { UIHelper.Error("Bán kính không hợp lệ."); return; }
+        Console.WriteLine();
+        UIHelper.Header("CHỌN PHƯƠNG THỨC TÌM KIẾM");
+        UIHelper.MenuItem("1", "Tìm trong bán kính");
+        UIHelper.MenuItem("2", "Top K tài xế gần nhất");
+        UIHelper.Line();
 
-        var nearbyDrivers = driverManager.FindNearbyDrivers(customer.Location, radius);
-        if (nearbyDrivers.Count == 0) { Console.WriteLine("Không tìm thấy tài xế trong bán kính."); return; }
+        string? choice = UIHelper.PromptChoice("Chọn: ");
+        
+        if (choice == "2")
+        {
+            if (!int.TryParse(UIHelper.Prompt("Nhập số lượng tài xế cần tìm (K): "), out int k) || k <= 0)
+            { UIHelper.Error("Số lượng không hợp lệ."); return; }
 
-        Console.WriteLine($"\n--- TÀI XẾ GẦN {customer.Name} (bán kính {radius}km) ---");
-        foreach (var (distance, driver) in nearbyDrivers)
-            Console.WriteLine($"  {distance,5:F2}km - ID: {driver.Id,4} | {UIHelper.Truncate(driver.Name, 20),-20} | Đánh giá: {driver.Rating:F1} sao");
+            var topNearest = driverManager.FindTopNearestDrivers(customer.Location, k);
+            if (topNearest.Count == 0) { Console.WriteLine("Không tìm thấy tài xế."); return; }
+
+            Console.WriteLine($"\n--- TOP {topNearest.Count} TÀI XẾ GẦN NHẤT {customer.Name} ---");
+            foreach (var (distance, driver) in topNearest)
+                Console.WriteLine($"  {distance,5:F2}km - ID: {driver.Id,4} | {UIHelper.Truncate(driver.Name, 20),-20} | Đánh giá: {driver.Rating:F1} sao");
+        }
+        else
+        {
+            if (!double.TryParse(UIHelper.Prompt("Nhập bán kính tìm kiếm (km): "), out double radius) || radius <= 0)
+            { UIHelper.Error("Bán kính không hợp lệ."); return; }
+
+            var nearbyDrivers = driverManager.FindNearbyDrivers(customer.Location, radius);
+            if (nearbyDrivers.Count == 0) { Console.WriteLine("Không tìm thấy tài xế trong bán kính."); return; }
+
+            Console.WriteLine($"\n--- TÀI XẾ GẦN {customer.Name} (bán kính {radius}km) ---");
+            foreach (var (distance, driver) in nearbyDrivers)
+                Console.WriteLine($"  {distance,5:F2}km - ID: {driver.Id,4} | {UIHelper.Truncate(driver.Name, 20),-20} | Đánh giá: {driver.Rating:F1} sao");
+        }
     }
 
     private void BookRide()
@@ -487,35 +538,36 @@ public class AdminMenu
         int strategy = UIHelper.PromptChoice("Chọn tiêu chí (1-3): ") switch { "2" => 2, "3" => 3, _ => 1 };
         double radius = strategy switch { 1 => 10.0, 2 => 5.0, 3 => 7.0, _ => 10.0 };
 
-        var nearbyDrivers = driverManager.FindNearbyDrivers(customer.Location, radius);
-        if (nearbyDrivers.Count == 0) { Console.WriteLine("Không tìm thấy tài xế gần đây."); return; }
-
-        (double Distance, Driver Driver) bestMatch;
+        (double Distance, Driver Driver)? bestMatch = null;
         string strategyName;
 
         switch (strategy)
         {
-            case 2:
-                bestMatch = nearbyDrivers.OrderByDescending(d => d.Driver.Rating).First();
+            case 1: // Gần nhất - Dùng FindTopNearestDrivers với k=1
+                var topNearest = driverManager.FindTopNearestDrivers(customer.Location, 1);
+                if (topNearest.Count > 0)
+                {
+                    bestMatch = topNearest[0];
+                    strategyName = "Gần nhất";
+                }
+                break;
+            case 2: // Rating cao nhất - Dùng Heap-based O(m)
+                bestMatch = driverManager.FindTopRatedDriverInRadius(customer.Location, radius);
                 strategyName = "Đánh giá cao nhất";
                 break;
-            case 3:
-                double maxDist = nearbyDrivers.Max(d => d.Distance);
-                if (maxDist == 0) maxDist = 1;
-                bestMatch = nearbyDrivers
-                    .Select(d => new { d.Distance, d.Driver, Score = ((maxDist - d.Distance) / maxDist) * 0.6 + (d.Driver.Rating / 5.0) * 0.4 })
-                    .OrderByDescending(d => d.Score)
-                    .Select(d => (d.Distance, d.Driver))
-                    .First();
+            case 3: // Cân bằng - Dùng Heap-based O(m)
+                bestMatch = driverManager.FindBestBalancedDriverInRadius(customer.Location, radius);
                 strategyName = "Cân bằng";
-                break;
-            default:
-                bestMatch = nearbyDrivers[0];
-                strategyName = "Gần nhất";
                 break;
         }
 
-        var (distance, bestDriver) = bestMatch;
+        if (bestMatch == null)
+        {
+            Console.WriteLine("Không tìm thấy tài xế gần đây.");
+            return;
+        }
+
+        var (distance, bestDriver) = bestMatch.Value;
         double totalDistance = distance + destDistance;
 
         Console.WriteLine();

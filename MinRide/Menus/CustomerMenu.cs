@@ -189,13 +189,33 @@ public class CustomerMenu
         int strategy = strategyChoice switch { "2" => 2, "3" => 3, _ => 1 };
         double radius = strategy switch { 1 => 10.0, 2 => 5.0, 3 => 7.0, _ => 10.0 };
 
-        List<(double Distance, Driver Driver)> nearbyDrivers;
+        (double Distance, Driver Driver)? bestMatch = null;
+        string strategyName;
         int retryCount = 0;
 
         while (true)
         {
-            nearbyDrivers = driverManager.FindNearbyDrivers(customer.Location, radius);
-            if (nearbyDrivers.Count > 0) break;
+            switch (strategy)
+            {
+                case 1: // Gần nhất - Dùng FindTopNearestDrivers với k=1
+                    var topNearest = driverManager.FindTopNearestDrivers(customer.Location, 1);
+                    if (topNearest.Count > 0)
+                    {
+                        bestMatch = topNearest[0];
+                        strategyName = "Gần nhất";
+                    }
+                    break;
+                case 2: // Rating cao nhất - Dùng Heap-based O(m)
+                    bestMatch = driverManager.FindTopRatedDriverInRadius(customer.Location, radius);
+                    strategyName = "Đánh giá cao nhất";
+                    break;
+                case 3: // Cân bằng - Dùng Heap-based O(m)
+                    bestMatch = driverManager.FindBestBalancedDriverInRadius(customer.Location, radius);
+                    strategyName = "Cân bằng";
+                    break;
+            }
+
+            if (bestMatch != null) break;
 
             Console.WriteLine($"Không tìm thấy tài xế trong bán kính {radius:F1}km.");
             if (retryCount >= 3) { UIHelper.Error("Không thể tìm thấy tài xế."); return; }
@@ -205,32 +225,7 @@ public class CustomerMenu
             retryCount++;
         }
 
-        (double Distance, Driver Driver) bestMatch;
-        string strategyName;
-
-        switch (strategy)
-        {
-            case 2:
-                bestMatch = nearbyDrivers.OrderByDescending(d => d.Driver.Rating).First();
-                strategyName = "Đánh giá cao nhất";
-                break;
-            case 3:
-                double maxDist = nearbyDrivers.Max(d => d.Distance);
-                if (maxDist == 0) maxDist = 1;
-                bestMatch = nearbyDrivers
-                    .Select(d => new { d.Distance, d.Driver, Score = ((maxDist - d.Distance) / maxDist) * 0.6 + (d.Driver.Rating / 5.0) * 0.4 })
-                    .OrderByDescending(d => d.Score)
-                    .Select(d => (d.Distance, d.Driver))
-                    .First();
-                strategyName = "Cân bằng";
-                break;
-            default:
-                bestMatch = nearbyDrivers[0];
-                strategyName = "Gần nhất";
-                break;
-        }
-
-        var (driverDistance, bestDriver) = bestMatch;
+        var (driverDistance, bestDriver) = bestMatch.Value;
         double totalDistance = driverDistance + destDistance;
         double fare = totalDistance * 12000;
 

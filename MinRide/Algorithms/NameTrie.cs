@@ -149,48 +149,6 @@ public class NameTrie
     }
 
     /// <summary>
-    /// Searches for all IDs where the name contains the given substring (case-insensitive).
-    /// </summary>
-    /// <param name="substring">The substring to search for (case-insensitive).</param>
-    /// <returns>A list of IDs that contain the substring.</returns>
-    public List<int> SearchBySubstring(string substring)
-    {
-        if (string.IsNullOrEmpty(substring))
-            return new List<int>();
-
-        // For substring search, we need to collect all IDs and filter
-        // This is less efficient than prefix search but still better than linear scan for large datasets
-        substring = substring.ToLower();
-        List<int> result = new List<int>();
-        
-        // We'll need to traverse all paths - use DFS to collect all nodes
-        CollectMatchingIds(root, "", substring, result);
-        
-        return result;
-    }
-
-    /// <summary>
-    /// Recursively collects IDs where the name contains the given substring.
-    /// </summary>
-    private void CollectMatchingIds(TrieNode node, string currentPath, string substring, List<int> result)
-    {
-        // Check if current path contains the substring
-        if (currentPath.Contains(substring))
-        {
-            result.AddRange(node.Ids);
-            // No need to search children since substring was found
-            return;
-        }
-
-        // Continue searching in children
-        foreach (var kvp in node.Children)
-        {
-            string newPath = currentPath + kvp.Key;
-            CollectMatchingIds(kvp.Value, newPath, substring, result);
-        }
-    }
-
-    /// <summary>
     /// Clears all entries from the Trie.
     /// </summary>
     public void Clear()
