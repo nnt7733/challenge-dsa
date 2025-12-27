@@ -46,9 +46,16 @@ class Program
             // Optional: regenerate sample data quickly for friends to clone & test
             if (args.Any(a => string.Equals(a, "--generate-data", StringComparison.OrdinalIgnoreCase)))
             {
-                DataGenerator.GenerateAndSaveData(10, 10, 10, "Data");
+                int driverCount = 10, customerCount = 10, rideCount = 10;
+                
+                // Parse command line arguments: --generate-data [drivers] [customers] [rides]
+                if (args.Length >= 2 && int.TryParse(args[1], out int d)) driverCount = d;
+                if (args.Length >= 3 && int.TryParse(args[2], out int c)) customerCount = c;
+                if (args.Length >= 4 && int.TryParse(args[3], out int r)) rideCount = r;
+                
+                DataGenerator.GenerateAndSaveData(driverCount, customerCount, rideCount, "Data");
                 Console.WriteLine();
-                UIHelper.Success("Đã sinh lại dữ liệu mẫu (10 tài xế, 10 khách hàng, 10 chuyến đi).");
+                UIHelper.Success($"Đã sinh lại dữ liệu mẫu ({driverCount} tài xế, {customerCount} khách hàng, {rideCount} chuyến đi).");
                 UIHelper.Info("Bạn có thể chạy lại chương trình để bắt đầu sử dụng dữ liệu mới.");
                 return;
             }

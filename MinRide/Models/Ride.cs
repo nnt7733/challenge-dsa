@@ -123,7 +123,7 @@ public class Ride
         StartTime = DateTime.Now;
         // Calculate expected completion time: distance * 15 seconds per km
         int travelSeconds = (int)(Distance * SECONDS_PER_KM);
-        ExpectedCompletionTime = StartTime.Value.AddSeconds(travelSeconds);
+        ExpectedCompletionTime = StartTime!.Value.AddSeconds(travelSeconds);
     }
 
     /// <summary>

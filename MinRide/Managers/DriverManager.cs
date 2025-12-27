@@ -72,6 +72,20 @@ public class DriverManager
     /// <param name="driver">The driver to add.</param>
     public void AddDriver(Driver driver, bool silent = false)
     {
+        // Check for duplicate ID to prevent inconsistency
+        if (idToIndex.ContainsKey(driver.Id))
+        {
+            var existingDriver = FindDriverById(driver.Id);
+            if (existingDriver != null && !existingDriver.IsDeleted)
+            {
+                if (!silent)
+                {
+                    Console.WriteLine($"[X] Lỗi: ID {driver.Id} đã tồn tại. Vui lòng sử dụng AddDriverWithValidation() để kiểm tra.");
+                }
+                return;
+            }
+        }
+        
         idToIndex[driver.Id] = drivers.Count;
         driver.IsDeleted = false;
         drivers.Add(driver);
@@ -350,7 +364,7 @@ public class DriverManager
             return;
         }
 
-        Driver driverToUpdate;
+        Driver? driverToUpdate;
 
         if (matchingDrivers.Count == 1)
         {
@@ -382,7 +396,7 @@ public class DriverManager
                 return;
             }
 
-            driverToUpdate = matchingDrivers.FirstOrDefault(d => d.Id == selectedId)!;
+            driverToUpdate = matchingDrivers.FirstOrDefault(d => d.Id == selectedId);
             if (driverToUpdate == null)
             {
                 Console.WriteLine("ID không nằm trong danh sách tìm kiếm.");
@@ -678,12 +692,10 @@ public class DriverManager
                     maxHeap.Dequeue();
                     maxHeap.Enqueue((distance, driver), -distance);
                     
-                    // Update maxDistance - peek at the top element
+                    // Update maxDistance - peek at the top element (largest distance in heap)
                     if (maxHeap.Count > 0)
                     {
-                        var temp = maxHeap.Dequeue();
-                        maxDistance = temp.Distance;
-                        maxHeap.Enqueue(temp, -temp.Distance);
+                        maxDistance = maxHeap.Peek().Distance;
                     }
                 }
             }

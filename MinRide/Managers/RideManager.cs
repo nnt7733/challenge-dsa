@@ -59,6 +59,10 @@ public class RideManager
     /// <param name="customerId">The ID of the customer requesting the ride.</param>
     /// <param name="driverId">The ID of the assigned driver.</param>
     /// <param name="distance">The distance of the ride in kilometers.</param>
+    /// <remarks>
+    /// Note: This method does not validate that customerId and driverId exist.
+    /// Callers should validate these IDs before calling this method to prevent invalid rides.
+    /// </remarks>
     public void CreateRide(int customerId, int driverId, double distance)
     {
         Ride ride = new Ride(nextRideId, customerId, driverId, distance);
@@ -75,6 +79,10 @@ public class RideManager
     /// <param name="driverId">The ID of the assigned driver.</param>
     /// <param name="distance">The distance of the ride in kilometers.</param>
     /// <returns>The created ride.</returns>
+    /// <remarks>
+    /// Note: This method does not validate that customerId and driverId exist.
+    /// Callers should validate these IDs before calling this method to prevent invalid rides.
+    /// </remarks>
     public Ride CreateRideAndStart(int customerId, int driverId, double distance)
     {
         Ride ride = new Ride(nextRideId, customerId, driverId, distance);

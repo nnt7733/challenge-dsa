@@ -34,7 +34,7 @@ public class AuthManager
     /// </summary>
     private void LoadPasswords()
     {
-        // Default admin password
+        // Default admin password (will be overridden if exists in file)
         passwords["admin"] = "admin";
 
         if (File.Exists(PasswordsFilePath))
@@ -48,7 +48,7 @@ public class AuthManager
                     var parts = line.Split(',');
                     if (parts.Length >= 2)
                     {
-                        passwords[parts[0]] = parts[1];
+                        passwords[parts[0]] = parts[1]; // Override default admin password if exists
                     }
                 }
             }
@@ -89,10 +89,8 @@ public class AuthManager
             var lines = new List<string> { "Username,Password" };
             foreach (var kvp in passwords)
             {
-                if (kvp.Key != "admin") // Don't save admin password
-                {
-                    lines.Add($"{kvp.Key},{kvp.Value}");
-                }
+                // Save all passwords including admin (if changed)
+                lines.Add($"{kvp.Key},{kvp.Value}");
             }
             File.WriteAllLines(PasswordsFilePath, lines);
         }

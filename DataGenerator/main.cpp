@@ -19,9 +19,9 @@
 using namespace std;
 
 // ==================== CAU HINH ====================
-const int SO_TAI_XE = 10;
-const int SO_KHACH_HANG = 10;
-const int SO_CHUYEN_DI = 5;
+const int SO_TAI_XE = 100;
+const int SO_KHACH_HANG = 100;
+const int SO_CHUYEN_DI = 500;
 const string THU_MUC_OUTPUT = "../MinRide/Data";  // Thay doi neu can
 // ==================================================
 

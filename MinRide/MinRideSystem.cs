@@ -56,6 +56,8 @@ public class MinRideSystem
                 {
                     // Reset TotalRides to 0, will be synced from actual rides
                     driver.SetTotalRides(0);
+                    // Reset rating data to 0, will be synced from actual rides with ratings
+                    driver.SetRatingData(0, 0);
                     driverManager.AddDriver(driver, silent: true);
                     driverCount++;
                 }
@@ -110,6 +112,12 @@ public class MinRideSystem
                     if (ride.Status == "COMPLETED")
                     {
                         driver.IncrementRides();
+                        
+                        // Sync rating: if ride has customer rating, add it to driver
+                        if (ride.CustomerRating.HasValue)
+                        {
+                            driver.AddRating(ride.CustomerRating.Value);
+                        }
                     }
                 }
             }

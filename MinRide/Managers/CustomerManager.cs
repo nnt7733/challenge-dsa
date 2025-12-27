@@ -67,6 +67,20 @@ public class CustomerManager
     /// <param name="silent">If true, suppresses console output.</param>
     public void AddCustomer(Customer customer, bool silent = false)
     {
+        // Check for duplicate ID to prevent inconsistency
+        if (idToIndex.ContainsKey(customer.Id))
+        {
+            var existingCustomer = FindCustomerById(customer.Id);
+            if (existingCustomer != null && !existingCustomer.IsDeleted)
+            {
+                if (!silent)
+                {
+                    Console.WriteLine($"[X] Lỗi: ID {customer.Id} đã tồn tại. Vui lòng sử dụng AddCustomerWithValidation() để kiểm tra.");
+                }
+                return;
+            }
+        }
+        
         idToIndex[customer.Id] = customers.Count;
         customer.IsDeleted = false;
         customers.Add(customer);

@@ -539,7 +539,7 @@ public class AdminMenu
         double radius = strategy switch { 1 => 10.0, 2 => 5.0, 3 => 7.0, _ => 10.0 };
 
         (double Distance, Driver Driver)? bestMatch = null;
-        string strategyName;
+        string strategyName = "";
 
         switch (strategy)
         {

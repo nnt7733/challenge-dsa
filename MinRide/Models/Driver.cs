@@ -109,6 +109,11 @@ public class Driver
         {
             Rating = Math.Round(ratingSum / ratingCount, 1);
         }
+        else
+        {
+            // If no ratings, set to default 5.0 (for new drivers)
+            Rating = 5.0;
+        }
     }
 
     /// <summary>

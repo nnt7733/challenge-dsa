@@ -60,9 +60,20 @@ public class UndoStack
             return;
         }
 
-        Action action = undoActions.Pop();
-        action.Invoke();
-        Console.WriteLine("Undo operation completed successfully.");
+        // Peek first to check if action exists, only pop after successful execution
+        Action action = undoActions.Peek();
+        try
+        {
+            action.Invoke();
+            undoActions.Pop(); // Only remove from stack if execution succeeded
+            Console.WriteLine("Undo operation completed successfully.");
+        }
+        catch (Exception ex)
+        {
+            // If execution fails, keep the action in stack and report error
+            Console.WriteLine($"Undo operation failed: {ex.Message}");
+            throw; // Re-throw to allow caller to handle
+        }
     }
 
     /// <summary>
